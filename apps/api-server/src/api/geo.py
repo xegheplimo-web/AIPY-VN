@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_db
 from src.services.geo_search import GeoSearchService
+from src.services.geo_cache import GeoCacheService, get_geo_cache
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,8 @@ router = APIRouter(prefix="/api/geo", tags=["Geo Search"])
 
 async def get_geo_service(session: AsyncSession = Depends(get_db)) -> GeoSearchService:
     """Dependency injection for GeoSearchService."""
-    return GeoSearchService(session)
+    cache = get_geo_cache()
+    return GeoSearchService(session, cache=cache)
 
 
 @router.get("/search")
@@ -36,7 +38,7 @@ async def search_stores(
 ):
     """
     🔍 Tìm kiếm cửa hàng thông minh.
-    
+
     Hỗ trợ:
     - Tìm theo tên: `?q=Circle K`
     - Tìm gần vị trí: `?q=cafe&lat=10.77&lng=106.70`
@@ -46,9 +48,14 @@ async def search_stores(
     - Không dấu: `?q=ca phe`
     """
     return await svc.search(
-        query=q, lat=lat, lng=lng,
-        radius_km=radius, category=category,
-        brand=brand, limit=limit, offset=offset,
+        query=q,
+        lat=lat,
+        lng=lng,
+        radius_km=radius,
+        category=category,
+        brand=brand,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -64,13 +71,17 @@ async def find_nearby(
 ):
     """
     📍 Tìm cửa hàng gần nhất.
-    
+
     Ví dụ: Tìm ATM gần Quận 1:
     `?lat=10.7769&lng=106.7009&category=atm&radius=2`
     """
     return await svc.find_nearby(
-        lat=lat, lng=lng, radius_km=radius,
-        category=category, brand=brand, limit=limit,
+        lat=lat,
+        lng=lng,
+        radius_km=radius,
+        category=category,
+        brand=brand,
+        limit=limit,
     )
 
 
@@ -81,11 +92,11 @@ async def geocode(
 ):
     """
     📍 Địa chỉ → Tọa độ (self-hosted).
-    
+
     Ví dụ: `?address=Nguyễn Huệ, Quận 1`
     """
     result = await svc.geocode(address)
-    if not result['results']:
+    if not result["results"]:
         raise HTTPException(status_code=404, detail="Không tìm thấy địa chỉ")
     return result
 
@@ -132,25 +143,59 @@ async def autocomplete(
     Trả về nhanh, tối ưu cho UX.
     """
     result = await svc.search(
-        query=q, lat=lat, lng=lng,
+        query=q,
+        lat=lat,
+        lng=lng,
         limit=limit,
     )
-    
+
     return {
-        'suggestions': [
+        "suggestions": [
             {
-                'id': s['id'],
-                'name': s['name'],
-                'address': s['address'],
-                'category_icon': (
-                    s['category']['icon'] 
-                    if s.get('category') else None
-                ),
-                'distance': (
-                    s['distance']['text'] 
-                    if s.get('distance') else None
-                ),
+                "id": s["id"],
+                "name": s["name"],
+                "address": s["address"],
+                "category_icon": (s["category"]["icon"] if s.get("category") else None),
+                "distance": (s["distance"]["text"] if s.get("distance") else None),
             }
-            for s in result['stores']
+            for s in result["stores"]
         ]
+    }
+
+
+@router.get("/cache/stats")
+async def cache_stats(cache: GeoCacheService = Depends(get_geo_cache)):
+    """📊 Thống kê cache."""
+    return await cache.get_stats()
+
+
+@router.post("/cache/invalidate")
+async def invalidate_cache(
+    pattern: str = Query(..., description="Pattern để invalidate (ví dụ: 'nearby:*')"),
+    cache: GeoCacheService = Depends(get_geo_cache),
+):
+    """
+    🗑️ Invalidate cache theo pattern.
+
+    Ví dụ: `?pattern=nearby:*` sẽ xóa tất cả nearby cache.
+    """
+    count = await cache.invalidate_pattern(pattern)
+    return {
+        "pattern": pattern,
+        "invalidated": count,
+        "message": f"Đã xóa {count} cache keys matching '{pattern}'",
+    }
+
+
+@router.post("/cache/flush")
+async def flush_cache(cache: GeoCacheService = Depends(get_geo_cache)):
+    """
+    🗑️ Xóa toàn bộ cache.
+
+    Cẩn thận: Sẽ xóa tất cả cache keys!
+    """
+    success = await cache.flush_all()
+    return {
+        "success": success,
+        "message": "Đã xóa toàn bộ cache" if success else "Không thể xóa cache",
     }
