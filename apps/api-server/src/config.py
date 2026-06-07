@@ -181,6 +181,9 @@ class AppConfig(BaseSettings):
     # Logging
     log_level: str = Field(default="info", alias="LOG_LEVEL")
 
+    # CSRF
+    csrf_secret_key: str = Field(default="", alias="CSRF_SECRET_KEY")
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -226,3 +229,6 @@ def validate_config() -> None:
 
         if not config.qdrant.api_key:
             print("WARNING: QDRANT_API_KEY not set in production")
+
+        if not config.csrf_secret_key:
+            print("WARNING: CSRF_SECRET_KEY not set in production")

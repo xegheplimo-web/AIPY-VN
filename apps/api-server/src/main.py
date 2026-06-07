@@ -4,6 +4,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 import os
 import logging
+import asyncio
 
 from src.api import (
     search,
@@ -29,8 +30,10 @@ from src.middleware import (
     RateLimitMiddleware,
     AuthMiddleware,
     RequestValidationMiddleware,
+    CSRFMiddleware,
+    BodySizeLimitMiddleware,
 )
-from src.services.ecc import init_ecc_service
+from src.services.ecc import init_ecc_service, get_e2e_service
 from src.config import config, validate_config
 from src.sentry_config import init_sentry
 
@@ -66,11 +69,34 @@ async def lifespan(app: FastAPI):
         ecc_service = get_ecc_service()
         os.environ["ECC_PRIVATE_KEY_PEM"] = ecc_service.get_private_key_pem()
         logger.warning(
-            "Generated new ECC key pair. Check ECC_PRIVATE_KEY_PEM environment variable."
+            "Generated new ECC key pair. Save ECC_PRIVATE_KEY_PEM environment variable securely."
         )
-        logger.warning("IMPORTANT: Save this key securely for production use.")
+        logger.warning(
+            "IMPORTANT: In production, set ECC_PRIVATE_KEY_PEM in your environment configuration."
+        )
+
+    # Start background task for session key cleanup
+    async def cleanup_session_keys():
+        """Periodically cleanup expired session keys."""
+        while True:
+            try:
+                await asyncio.sleep(300)  # Run every 5 minutes
+                e2e_service = get_e2e_service()
+                e2e_service.cleanup_expired_sessions()
+            except Exception as e:
+                logger.error(f"Session key cleanup error: {e}", exc_info=True)
+
+    # Start the cleanup task
+    cleanup_task = asyncio.create_task(cleanup_session_keys())
 
     yield
+
+    # Cleanup on shutdown
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
@@ -81,22 +107,56 @@ app = FastAPI(
 )
 
 # Production middleware
-# app.add_middleware(RequestValidationMiddleware)
+app.add_middleware(RequestValidationMiddleware)
+app.add_middleware(BodySizeLimitMiddleware, max_size=10 * 1024 * 1024)  # 10MB
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(RateLimitMiddleware, max_requests=200, window=60)
-# app.add_middleware(AuthMiddleware)
+
+# Enable authentication middleware in production
+if config.is_production:
+    app.add_middleware(AuthMiddleware)
+    logger.info("Authentication middleware enabled")
+else:
+    logger.warning("Authentication middleware disabled in development mode")
+
+# Enable CSRF protection in production
+if config.is_production:
+    app.add_middleware(
+        CSRFMiddleware,
+        secret_key=(
+            config.csrf_secret_key if hasattr(config, "csrf_secret_key") else None
+        ),
+    )
+    logger.info("CSRF middleware enabled")
+else:
+    logger.warning("CSRF middleware disabled in development mode")
 
 # Response compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Parse CORS origins from config
+cors_origins = (
+    config.cors_origins.split(",")
+    if config.cors_origins
+    else [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:3001",
         "http://localhost:3002",
-    ],
+    ]
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=(
+        cors_origins
+        if config.is_development
+        else (
+            [config.production_frontend_url]
+            if hasattr(config, "production_frontend_url")
+            else cors_origins
+        )
+    ),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
@@ -105,6 +165,7 @@ app.add_middleware(
         "X-Signature",
         "X-Timestamp",
         "X-Request-ID",
+        "X-CSRF-Token",
     ],
 )
 
@@ -151,15 +212,49 @@ async def health_check():
     from src.cache import cache
     from src.vector_db import vector_db
     from src.config import config
+    from sqlalchemy import text
+    from src.db import async_session
 
-    return {
+    health_status = {
         "status": "ok",
         "version": "1.0.0",
         "environment": config.environment,
         "services": {
-            "database": "connected",
-            "cache": "connected" if cache.client else "disabled",
-            "vector_db": "connected" if vector_db.client else "disabled",
+            "database": "unknown",
+            "cache": "disabled",
+            "vector_db": "disabled",
         },
-        "timestamp": "2026-06-07T21:00:00Z",
+        "timestamp": "2026-06-08T00:00:00Z",
     }
+
+    # Test database connection
+    try:
+        async with async_session() as session:
+            await session.execute(text("SELECT 1"))
+        health_status["services"]["database"] = "ok"
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        health_status["services"]["database"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+
+    # Test cache
+    if cache.client:
+        try:
+            await cache.client.ping()
+            health_status["services"]["cache"] = "ok"
+        except Exception as e:
+            logger.error(f"Cache health check failed: {e}")
+            health_status["services"]["cache"] = f"error: {str(e)}"
+            health_status["status"] = "degraded"
+
+    # Test vector DB
+    if vector_db.client:
+        try:
+            collections = vector_db.client.get_collections()
+            health_status["services"]["vector_db"] = "ok"
+        except Exception as e:
+            logger.error(f"Vector DB health check failed: {e}")
+            health_status["services"]["vector_db"] = f"error: {str(e)}"
+            health_status["status"] = "degraded"
+
+    return health_status

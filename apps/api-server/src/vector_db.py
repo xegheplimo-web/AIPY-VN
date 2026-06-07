@@ -6,16 +6,19 @@ In production, configure via environment variables.
 """
 
 import os
+import logging
 from typing import List, Optional
 
 # Qdrant client (install via: uv add qdrant-client)
 try:
     from qdrant_client import QdrantClient
     from qdrant_client.models import Distance, VectorParams, PointStruct
+
     QDRANT_AVAILABLE = True
 except ImportError:
     QDRANT_AVAILABLE = False
 
+logger = logging.getLogger(__name__)
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 COLLECTION_NAME = os.getenv("VECTOR_COLLECTION", "vietstore_products")
@@ -31,13 +34,13 @@ class VectorDBClient:
 
     def _init_client(self):
         if not QDRANT_AVAILABLE:
-            print("WARNING: qdrant-client not installed. Vector search disabled.")
+            logger.warning("qdrant-client not installed. Vector search disabled.")
             return
         try:
             self.client = QdrantClient(url=QDRANT_URL)
             self._ensure_collection()
         except Exception as e:
-            print(f"WARNING: Could not connect to Qdrant: {e}")
+            logger.warning(f"Could not connect to Qdrant: {e}")
             self.client = None
 
     def _ensure_collection(self):
@@ -55,9 +58,9 @@ class VectorDBClient:
                         distance=Distance.COSINE,
                     ),
                 )
-                print(f"Created Qdrant collection: {COLLECTION_NAME}")
+                logger.info(f"Created Qdrant collection: {COLLECTION_NAME}")
         except Exception as e:
-            print(f"WARNING: Could not ensure collection: {e}")
+            logger.error(f"Could not ensure collection: {e}", exc_info=True)
 
     def upsert_product(
         self,
@@ -75,7 +78,7 @@ class VectorDBClient:
             )
             return True
         except Exception as e:
-            print(f"ERROR: Failed to upsert product {product_id}: {e}")
+            logger.error(f"Failed to upsert product {product_id}: {e}", exc_info=True)
             return False
 
     def search(
@@ -103,7 +106,7 @@ class VectorDBClient:
                 for r in results
             ]
         except Exception as e:
-            print(f"ERROR: Vector search failed: {e}")
+            logger.error(f"Vector search failed: {e}", exc_info=True)
             return []
 
     def delete_product(self, product_id: str) -> bool:
@@ -117,7 +120,7 @@ class VectorDBClient:
             )
             return True
         except Exception as e:
-            print(f"ERROR: Failed to delete product {product_id}: {e}")
+            logger.error(f"Failed to delete product {product_id}: {e}", exc_info=True)
             return False
 
 

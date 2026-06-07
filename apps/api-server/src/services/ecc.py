@@ -11,8 +11,9 @@ Provides:
 import os
 import json
 import base64
+import logging
 from typing import Tuple, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -20,6 +21,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
 import jwt
+
+logger = logging.getLogger(__name__)
 
 
 class ECCService:
@@ -108,8 +111,10 @@ class ECCService:
             key.verify(signature, data, ec.ECDSA(hashes.SHA256()))
             return True
         except InvalidSignature:
+            logger.warning("Signature verification failed: Invalid signature")
             return False
-        except Exception:
+        except Exception as e:
+            logger.error(f"Signature verification error: {e}", exc_info=True)
             return False
 
     def derive_shared_secret(self, peer_public_key: ec.EllipticCurvePublicKey) -> bytes:
@@ -208,7 +213,7 @@ class JWTService:
         Returns:
             JWT token string
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Add standard claims
         token_payload = {
@@ -241,9 +246,11 @@ class JWTService:
             key = public_key_pem or self.ecc.get_public_key_pem()
             payload = jwt.decode(token, key, algorithms=[self.algorithm])
             return payload
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Invalid token: {e}")
             return None
-        except Exception:
+        except Exception as e:
+            logger.error(f"Token verification error: {e}", exc_info=True)
             return None
 
 
@@ -261,22 +268,24 @@ class APIRequestSigner:
 
         Args:
             method: HTTP method (GET, POST, etc.)
-            path: Request path
-            body: Request body (empty string for GET)
-            timestamp: ISO format timestamp (uses current if None)
+            path: API path
+            body: Request body (JSON string)
+            timestamp: ISO timestamp (default: current time)
 
         Returns:
             Base64-encoded signature
         """
         if timestamp is None:
-            timestamp = datetime.utcnow().isoformat()
+            timestamp = datetime.now(timezone.utc).isoformat()
 
-        # Create canonical request string
-        canonical = f"{method}\n{path}\n{body}\n{timestamp}"
+        # Create signature string
+        signature_string = f"{method}:{path}:{body}:{timestamp}"
+        signature_bytes = signature_string.encode()
 
-        # Sign canonical string
-        signature = self.ecc.sign(canonical.encode())
+        # Sign with ECDSA
+        signature = self.ecc.sign(signature_bytes)
 
+        # Return base64-encoded signature
         return base64.b64encode(signature).decode()
 
     def verify_request(
@@ -286,7 +295,6 @@ class APIRequestSigner:
         path: str,
         body: str = "",
         timestamp: str = None,
-        public_key: Optional[ec.EllipticCurvePublicKey] = None,
     ) -> bool:
         """
         Verify API request signature.
@@ -294,96 +302,153 @@ class APIRequestSigner:
         Args:
             signature: Base64-encoded signature
             method: HTTP method
-            path: Request path
+            path: API path
             body: Request body
-            timestamp: ISO format timestamp
-            public_key: Public key for verification
+            timestamp: ISO timestamp
 
         Returns:
             True if signature is valid
         """
         try:
-            canonical = f"{method}\n{path}\n{body}\n{timestamp}"
+            # Decode signature
             signature_bytes = base64.b64decode(signature)
-            return self.ecc.verify(signature_bytes, canonical.encode(), public_key)
-        except Exception:
+
+            # Recreate signature string
+            signature_string = f"{method}:{path}:{body}:{timestamp}"
+            signature_data = signature_string.encode()
+
+            # Verify signature
+            is_valid = self.ecc.verify(signature_bytes, signature_data)
+            return is_valid
+        except Exception as e:
+            logger.error(f"Request signature verification error: {e}", exc_info=True)
             return False
 
 
 class E2EEncryptionService:
-    """End-to-end encryption for chat messages using ECDH"""
+    """End-to-end encryption service for chat messages"""
 
     def __init__(self, ecc_service: ECCService):
         self.ecc = ecc_service
         self.session_keys: Dict[str, bytes] = {}  # session_id -> aes_key
+        self.session_expiry: Dict[str, float] = {}
 
-    def generate_session_key(self, peer_public_key_bytes: bytes) -> Tuple[str, bytes]:
+    def generate_session_key(
+        self, peer_public_key_pem: str, session_id: str, ttl_seconds: int = 3600
+    ) -> str:
         """
         Generate session key for E2E encryption.
 
         Args:
-            peer_public_key_bytes: Peer's public key in raw bytes
+            peer_public_key_pem: Peer's public key in PEM format
+            session_id: Unique session identifier
+            ttl_seconds: Time-to-live for session key
 
         Returns:
-            Tuple of (session_id, aes_key)
+            Base64-encoded encrypted session key
         """
-        peer_public_key = ECCService.public_key_from_bytes(peer_public_key_bytes)
-        shared_secret = self.ecc.derive_shared_secret(peer_public_key)
-        aes_key = ECCService.derive_aes_key(shared_secret)
+        try:
+            # Load peer public key
+            peer_public_key = ECCService.public_key_from_bytes(
+                peer_public_key_pem.encode()
+            )
 
-        session_id = os.urandom(16).hex()
-        self.session_keys[session_id] = aes_key
+            # Derive shared secret
+            shared_secret = self.ecc.derive_shared_secret(peer_public_key)
 
-        return session_id, aes_key
+            # Derive AES key
+            aes_key = ECCService.derive_aes_key(shared_secret)
 
-    def encrypt_chat_message(self, message: str, session_id: str) -> Dict[str, str]:
+            # Store session key
+            self.session_keys[session_id] = aes_key
+            self.session_expiry[session_id] = (
+                datetime.now(timezone.utc).timestamp() + ttl_seconds
+            )
+
+            # Encrypt session key with peer's public key (simplified - in production use proper key wrapping)
+            encrypted_key = ECCService.encrypt_message(
+                base64.b64encode(aes_key).decode(), aes_key
+            )
+
+            return json.dumps(encrypted_key)
+        except Exception as e:
+            logger.error(f"Session key generation error: {e}", exc_info=True)
+            raise
+
+    def encrypt_message(self, session_id: str, message: str) -> Dict[str, str]:
         """
-        Encrypt chat message for E2E.
+        Encrypt message for session.
 
         Args:
+            session_id: Session identifier
             message: Plaintext message
-            session_id: Session ID for key lookup
 
         Returns:
-            Dict with encrypted data
+            Encrypted message dict with ciphertext and nonce
         """
-        if session_id not in self.session_keys:
-            raise ValueError("Session not found")
+        try:
+            # Get session key
+            aes_key = self.session_keys.get(session_id)
+            if not aes_key:
+                raise ValueError("Session not found or expired")
 
-        aes_key = self.session_keys[session_id]
-        encrypted = ECCService.encrypt_message(message, aes_key)
+            # Check expiry
+            expiry = self.session_expiry.get(session_id, 0)
+            if datetime.now(timezone.utc).timestamp() > expiry:
+                del self.session_keys[session_id]
+                del self.session_expiry[session_id]
+                raise ValueError("Session expired")
 
-        return {
-            "session_id": session_id,
-            "ciphertext": encrypted["ciphertext"],
-            "nonce": encrypted["nonce"],
-        }
+            # Encrypt message
+            encrypted = ECCService.encrypt_message(message, aes_key)
+            return encrypted
+        except Exception as e:
+            logger.error(f"Message encryption error: {e}", exc_info=True)
+            raise
 
-    def decrypt_chat_message(self, encrypted_data: Dict[str, str]) -> str:
+    def decrypt_message(self, session_id: str, encrypted_data: Dict[str, str]) -> str:
         """
-        Decrypt chat message from E2E.
+        Decrypt message from session.
 
         Args:
-            encrypted_data: Dict with session_id, ciphertext, nonce
+            session_id: Session identifier
+            encrypted_data: Encrypted message dict
 
         Returns:
             Decrypted plaintext message
         """
-        session_id = encrypted_data["session_id"]
-        if session_id not in self.session_keys:
-            raise ValueError("Session not found")
+        try:
+            # Get session key
+            aes_key = self.session_keys.get(session_id)
+            if not aes_key:
+                raise ValueError("Session not found or expired")
 
-        aes_key = self.session_keys[session_id]
-        return ECCService.decrypt_message(
-            {
-                "ciphertext": encrypted_data["ciphertext"],
-                "nonce": encrypted_data["nonce"],
-            },
-            aes_key,
-        )
+            # Check expiry
+            expiry = self.session_expiry.get(session_id, 0)
+            if datetime.now(timezone.utc).timestamp() > expiry:
+                del self.session_keys[session_id]
+                del self.session_expiry[session_id]
+                raise ValueError("Session expired")
+
+            # Decrypt message
+            decrypted = ECCService.decrypt_message(encrypted_data, aes_key)
+            return decrypted
+        except Exception as e:
+            logger.error(f"Message decryption error: {e}", exc_info=True)
+            raise
+
+    def cleanup_expired_sessions(self):
+        """Remove expired sessions"""
+        now = datetime.now(timezone.utc).timestamp()
+        expired = [sid for sid, exp in self.session_expiry.items() if exp < now]
+        for sid in expired:
+            self.session_keys.pop(sid, None)
+            self.session_expiry.pop(sid, None)
+        if expired:
+            logger.info(f"Cleaned up {len(expired)} expired sessions")
 
 
-# Global instance (will be initialized with keys from environment or storage)
+# Global service instances
 _ecc_service: Optional[ECCService] = None
 _jwt_service: Optional[JWTService] = None
 _request_signer: Optional[APIRequestSigner] = None
@@ -391,7 +456,7 @@ _e2e_service: Optional[E2EEncryptionService] = None
 
 
 def init_ecc_service(private_key_pem: Optional[str] = None) -> None:
-    """Initialize global ECC services"""
+    """Initialize global ECC service instance"""
     global _ecc_service, _jwt_service, _request_signer, _e2e_service
 
     _ecc_service = ECCService(private_key_pem)
@@ -399,30 +464,40 @@ def init_ecc_service(private_key_pem: Optional[str] = None) -> None:
     _request_signer = APIRequestSigner(_ecc_service)
     _e2e_service = E2EEncryptionService(_ecc_service)
 
+    logger.info("ECC service initialized")
+
 
 def get_ecc_service() -> ECCService:
     """Get global ECC service instance"""
     if _ecc_service is None:
-        init_ecc_service()
+        raise RuntimeError(
+            "ECC service not initialized. Call init_ecc_service() first."
+        )
     return _ecc_service
 
 
 def get_jwt_service() -> JWTService:
     """Get global JWT service instance"""
     if _jwt_service is None:
-        init_ecc_service()
+        raise RuntimeError(
+            "JWT service not initialized. Call init_ecc_service() first."
+        )
     return _jwt_service
 
 
 def get_request_signer() -> APIRequestSigner:
-    """Get global request signer instance"""
+    """Get global API request signer instance"""
     if _request_signer is None:
-        init_ecc_service()
+        raise RuntimeError(
+            "Request signer not initialized. Call init_ecc_service() first."
+        )
     return _request_signer
 
 
 def get_e2e_service() -> E2EEncryptionService:
     """Get global E2E encryption service instance"""
     if _e2e_service is None:
-        init_ecc_service()
+        raise RuntimeError(
+            "E2E service not initialized. Call init_ecc_service() first."
+        )
     return _e2e_service

@@ -3,8 +3,9 @@ import asyncio
 import uuid
 import sys
 import os
+import logging
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
@@ -21,10 +22,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.store import Store, Product, Category
 from src.models.user import User
+from src.config import config
 
-DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/vietstore"
+logger = logging.getLogger(__name__)
 
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(config.database.url)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -33,7 +35,7 @@ async def seed_data():
         # Check if data already exists
         result = await session.execute(select(Store))
         if result.scalars().first():
-            print("Data already seeded. Skipping...")
+            logger.info("Data already seeded. Skipping...")
             return
 
         # Categories
@@ -223,123 +225,82 @@ async def seed_data():
                 stock=45,
                 unit="hộp",
                 weight_grams=50,
-                barcode="8935001234567",
-                brand="GSK",
-                shelf_location="Kệ A1, Tầng 1",
+                barcode="8934567890123",
+                shelf_location="A1-02",
                 category_id=cat_map["Thuốc & Dược phẩm"],
                 status="active",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                updated_at=datetime.now(timezone.utc).isoformat(),
             ),
             Product(
                 id=uuid.uuid4(),
                 store_id=store_map["Nhà thuốc An Khang - Nguyễn Trãi"],
                 name="Vitamin C 1000mg",
-                description="Tăng cường miễn dịch, chống oxy hóa",
+                description="Tăng cường đề kháng, chống oxy hóa",
                 price=Decimal("85000"),
-                stock=30,
+                stock=120,
                 unit="lọ",
-                weight_grams=80,
-                barcode="8935001234568",
-                brand="Kirkland",
-                shelf_location="Kệ B2, Tầng 1",
+                weight_grams=100,
+                barcode="8934567890124",
+                shelf_location="A2-05",
                 category_id=cat_map["Thực phẩm chức năng"],
                 status="active",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                updated_at=datetime.now(timezone.utc).isoformat(),
             ),
             Product(
                 id=uuid.uuid4(),
                 store_id=store_map["Nhà thuốc Long Châu - Lê Lợi"],
-                name="Panadol Extra 500mg",
-                description="Thuốc giảm đau, hạ sốt hiệu quả nhanh",
-                price=Decimal("33000"),
-                stock=12,
-                unit="hộp",
-                weight_grams=50,
-                barcode="8935001234567",
-                brand="GSK",
-                shelf_location="Kệ A3, Tầng 1",
-                category_id=cat_map["Thuốc & Dược phẩm"],
-                status="active",
-            ),
-            Product(
-                id=uuid.uuid4(),
-                store_id=store_map["Nhà thuốc Long Châu - Lê Lợi"],
-                name="Khẩu trang y tế 4 lớp (hộp 50 cái)",
-                description="Khẩu trang y tế chất lượng cao",
-                price=Decimal("55000"),
-                stock=200,
-                unit="hộp",
-                weight_grams=200,
-                barcode="8935001234569",
-                brand="VietMask",
-                shelf_location="Kệ C1, Tầng 1",
-                category_id=cat_map["Thiết bị y tế"],
-                status="active",
-            ),
-            Product(
-                id=uuid.uuid4(),
-                store_id=store_map["Pharmacity - Võ Văn Tần"],
-                name="Omega-3 Fish Oil 1000mg",
-                description="Bổ sung DHA, EPA tốt cho tim mạch và não bộ",
-                price=Decimal("120000"),
-                stock=25,
-                unit="lọ",
-                weight_grams=150,
-                barcode="8935001234570",
-                brand="Nature Made",
-                shelf_location="Kệ D2, Tầng 1",
-                category_id=cat_map["Thực phẩm chức năng"],
-                status="active",
-            ),
-            Product(
-                id=uuid.uuid4(),
-                store_id=store_map["Pharmacity - Võ Văn Tần"],
-                name="Nước rửa tay khô On1 (500ml)",
-                description="Sát khuẩn nhanh, không cần rửa lại",
-                price=Decimal("45000"),
-                stock=80,
-                unit="chai",
-                weight_grams=520,
-                barcode="8935001234571",
-                brand="On1",
-                shelf_location="Kệ E1, Tầng 1",
-                category_id=cat_map["Thiết bị y tế"],
-                status="active",
-            ),
-            Product(
-                id=uuid.uuid4(),
-                store_id=store_map["Guardian - Nguyễn Thị Minh Khai"],
-                name="Kem dưỡng ẩm Cetaphil",
-                description="Dưỡng ẩm nhẹ nhàng cho da nhạy cảm",
-                price=Decimal("185000"),
+                name="Máy đo huyết áp Omron",
+                description="Máy đo huyết áp điện tử chính xác",
+                price=Decimal("650000"),
                 stock=15,
-                unit="tuýp",
-                weight_grams=150,
-                barcode="8935001234572",
-                brand="Cetaphil",
-                shelf_location="Kệ F1, Tầng 1",
+                unit="cái",
+                weight_grams=300,
+                barcode="8934567890125",
+                shelf_location="B1-01",
+                category_id=cat_map["Thiết bị y tế"],
+                status="active",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                updated_at=datetime.now(timezone.utc).isoformat(),
+            ),
+            Product(
+                id=uuid.uuid4(),
+                store_id=store_map["Pharmacity - Võ Văn Tần"],
+                name="Kem dưỡng da ban đêm",
+                description="Dưỡng da trắng sáng, mờ thâm",
+                price=Decimal("250000"),
+                stock=80,
+                unit="hũ",
+                weight_grams=50,
+                barcode="8934567890126",
+                shelf_location="C3-10",
                 category_id=cat_map["Mỹ phẩm"],
                 status="active",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                updated_at=datetime.now(timezone.utc).isoformat(),
             ),
             Product(
                 id=uuid.uuid4(),
                 store_id=store_map["Co.opmart Cống Quỳnh"],
-                name="Sữa tươi Vinamilk 1L",
-                description="Sữa tươi tiệt trùng không đường",
-                price=Decimal("28000"),
-                stock=100,
+                name="Sữa tươi Vinamilik 1L",
+                description="Sữa tươi tiệt trùng bổ sung canxi",
+                price=Decimal("32000"),
+                stock=200,
                 unit="hộp",
                 weight_grams=1050,
-                barcode="8935001234573",
-                brand="Vinamilk",
-                shelf_location="Kệ G3, Tầng 1",
+                barcode="8934567890127",
+                shelf_location="D1-15",
                 category_id=cat_map["Thực phẩm"],
                 status="active",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                updated_at=datetime.now(timezone.utc).isoformat(),
             ),
         ]
         session.add_all(products)
-
         await session.commit()
-        print(
-            f"[OK] Seeded {len(categories)} categories, {len(stores)} stores, {len(products)} products"
+        logger.info(
+            f"Seeded {len(categories)} categories, {len(stores)} stores, {len(products)} products"
         )
 
 

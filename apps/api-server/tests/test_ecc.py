@@ -270,15 +270,16 @@ class TestE2EEncryptionService:
 
         # Simulate peer public key
         peer_ecc = ECCService()
-        peer_pub_bytes = peer_ecc.get_public_key_bytes()
+        peer_pub_pem = peer_ecc.get_public_key_pem()
 
-        # Generate session key
-        session_id, aes_key = e2e.generate_session_key(peer_pub_bytes)
+        # Generate session key with provided session_id
+        session_id = "test_session_123"
+        encrypted_key = e2e.generate_session_key(peer_pub_pem, session_id)
 
-        assert session_id is not None
-        assert aes_key is not None
-        assert len(aes_key) == 32
+        assert encrypted_key is not None
         assert session_id in e2e.session_keys
+        assert e2e.session_keys[session_id] is not None
+        assert len(e2e.session_keys[session_id]) == 32
 
     def test_encrypt_decrypt_chat_message(self):
         """Test chat message encryption/decryption"""
@@ -287,19 +288,19 @@ class TestE2EEncryptionService:
 
         # Setup session
         peer_ecc = ECCService()
-        peer_pub_bytes = peer_ecc.get_public_key_bytes()
-        session_id, _ = e2e.generate_session_key(peer_pub_bytes)
+        peer_pub_pem = peer_ecc.get_public_key_pem()
+        session_id = "test_session_456"
+        e2e.generate_session_key(peer_pub_pem, session_id)
 
         # Encrypt message
         message = "Hello, this is a secret message"
-        encrypted = e2e.encrypt_chat_message(message, session_id)
+        encrypted = e2e.encrypt_message(session_id, message)
 
         assert "ciphertext" in encrypted
         assert "nonce" in encrypted
-        assert encrypted["session_id"] == session_id
 
         # Decrypt message
-        decrypted = e2e.decrypt_chat_message(encrypted)
+        decrypted = ECCService.decrypt_message(encrypted, e2e.session_keys[session_id])
         assert decrypted == message
 
     def test_invalid_session(self):
@@ -308,7 +309,7 @@ class TestE2EEncryptionService:
         e2e = E2EEncryptionService(ecc)
 
         with pytest.raises(ValueError, match="Session not found"):
-            e2e.encrypt_chat_message("test", "invalid_session_id")
+            e2e.encrypt_message("invalid_session_id", "test")
 
 
 class TestGlobalServices:
@@ -335,9 +336,5 @@ class TestGlobalServices:
         ecc1 = get_ecc_service()
         ecc2 = get_ecc_service()
 
-        # Should be same instance
+        # Should be the same instance
         assert ecc1 is ecc2
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

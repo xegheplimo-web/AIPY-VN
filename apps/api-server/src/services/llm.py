@@ -4,10 +4,16 @@ Ollama Cloud LLM Service for VietStore RAG
 Provides interface to Ollama cloud API for LLM inference.
 """
 
-import httpx
-import json
 import logging
 from typing import Optional, List, Dict, Any
+
+try:
+    import httpx
+
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+
 from src.config import config
 
 logger = logging.getLogger(__name__)
@@ -18,6 +24,11 @@ class OllamaCloudService:
 
     def __init__(self):
         """Initialize Ollama Cloud service."""
+        if not HTTPX_AVAILABLE:
+            logger.warning("httpx not installed, LLM service disabled")
+            self.api_key = None
+            return
+
         self.api_key = config.ollama.cloud_api_key
         self.base_url = config.ollama.cloud_url
         self.default_model = config.ollama.default_model
@@ -33,7 +44,7 @@ class OllamaCloudService:
         temperature: float = 0.7,
         max_tokens: int = 1000,
         system_prompt: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         Generate text using Ollama Cloud API.
@@ -49,6 +60,10 @@ class OllamaCloudService:
         Returns:
             Generated text response
         """
+        if not HTTPX_AVAILABLE:
+            logger.warning("httpx not available, cannot generate text")
+            return "Xin lỗi, dịch vụ LLM chưa sẵn sàng."
+
         model = model or self.default_model
 
         if model not in self.available_models:
@@ -67,7 +82,7 @@ class OllamaCloudService:
             "options": {
                 "temperature": temperature,
                 "num_predict": max_tokens,
-            }
+            },
         }
 
         if system_prompt:
@@ -82,7 +97,7 @@ class OllamaCloudService:
                 response = await client.post(
                     f"{self.base_url}/v1/chat/completions",
                     headers=headers,
-                    json=payload
+                    json=payload,
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -97,7 +112,9 @@ class OllamaCloudService:
                     return str(data)
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"Ollama Cloud API error: {e.response.status_code} - {e.response.text}")
+            logger.error(
+                f"Ollama Cloud API error: {e.response.status_code} - {e.response.text}"
+            )
             raise
         except Exception as e:
             logger.error(f"Error calling Ollama Cloud API: {e}")
@@ -109,7 +126,7 @@ class OllamaCloudService:
         model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 1000,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         Chat completion using Ollama Cloud API.
@@ -124,6 +141,10 @@ class OllamaCloudService:
         Returns:
             Generated text response
         """
+        if not HTTPX_AVAILABLE:
+            logger.warning("httpx not available, cannot generate text")
+            return "Xin lỗi, dịch vụ LLM chưa sẵn sàng."
+
         model = model or self.default_model
 
         if model not in self.available_models:
@@ -142,7 +163,7 @@ class OllamaCloudService:
             "options": {
                 "temperature": temperature,
                 "num_predict": max_tokens,
-            }
+            },
         }
 
         # Add any additional options
@@ -154,7 +175,7 @@ class OllamaCloudService:
                 response = await client.post(
                     f"{self.base_url}/v1/chat/completions",
                     headers=headers,
-                    json=payload
+                    json=payload,
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -169,7 +190,9 @@ class OllamaCloudService:
                     return str(data)
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"Ollama Cloud API error: {e.response.status_code} - {e.response.text}")
+            logger.error(
+                f"Ollama Cloud API error: {e.response.status_code} - {e.response.text}"
+            )
             raise
         except Exception as e:
             logger.error(f"Error calling Ollama Cloud API: {e}")
@@ -182,11 +205,14 @@ class OllamaCloudService:
         Returns:
             List of available model names
         """
+        if not HTTPX_AVAILABLE:
+            return self.available_models
+
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
                     f"{self.base_url}/v1/models",
-                    headers={"Authorization": f"Bearer {self.api_key}"}
+                    headers={"Authorization": f"Bearer {self.api_key}"},
                 )
                 response.raise_for_status()
                 data = response.json()

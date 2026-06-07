@@ -11,6 +11,8 @@ from .auth_middleware import (
     require_owner_or_admin,
 )
 from .validation import RequestValidationMiddleware
+from .csrf import CSRFMiddleware
+from .body_size import BodySizeLimitMiddleware
 
 __all__ = [
     "LoggingMiddleware",
@@ -22,4 +24,6 @@ __all__ = [
     "require_admin",
     "require_owner_or_admin",
     "RequestValidationMiddleware",
+    "CSRFMiddleware",
+    "BodySizeLimitMiddleware",
 ]
