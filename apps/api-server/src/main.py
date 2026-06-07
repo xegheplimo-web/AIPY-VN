@@ -2,7 +2,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from src.api import search, stores, products, owner, admin, orders, cart, chat, shipping
+from src.api import (
+    search,
+    stores,
+    products,
+    owner,
+    admin,
+    orders,
+    cart,
+    chat,
+    shipping,
+    voice,
+)
 from src.db import init_db
 
 
@@ -36,6 +47,7 @@ app.include_router(orders)
 app.include_router(cart)
 app.include_router(chat)
 app.include_router(shipping.router)
+app.include_router(voice.router)
 
 
 @app.get("/health")
