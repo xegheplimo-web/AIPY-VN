@@ -27,6 +27,7 @@ from src.api.profile import router as profile
 from src.api.categories import router as categories
 from src.api.favorites import router as favorites
 from src.api.store_locator import router as store_locator
+from src.api.geo import router as geo
 
 # from src.db import init_db  # Using Alembic migrations instead
 from src.middleware import (
@@ -198,6 +199,7 @@ app.include_router(profile, prefix=api_v1_prefix)
 app.include_router(categories, prefix=api_v1_prefix)
 app.include_router(favorites, prefix=api_v1_prefix)
 app.include_router(store_locator, prefix=api_v1_prefix)
+app.include_router(geo, prefix=api_v1_prefix)
 
 # Legacy routes (backward compatibility - no prefix)
 app.include_router(search)
@@ -219,6 +221,7 @@ app.include_router(profile)
 app.include_router(categories)
 app.include_router(favorites)
 app.include_router(store_locator)
+app.include_router(geo)
 
 
 @app.get("/health")
@@ -238,6 +241,7 @@ async def health_check():
             "database": "unknown",
             "cache": "disabled",
             "vector_db": "disabled",
+            "postgis": "disabled",
         },
         "timestamp": "2026-06-08T00:00:00Z",
     }
@@ -251,6 +255,15 @@ async def health_check():
         logger.error(f"Database health check failed: {e}")
         health_status["services"]["database"] = f"error: {str(e)}"
         health_status["status"] = "degraded"
+
+    # Test PostGIS
+    try:
+        async with async_session() as session:
+            await session.execute(text("SELECT PostGIS_Version()"))
+        health_status["services"]["postgis"] = "ok"
+    except Exception as e:
+        logger.error(f"PostGIS health check failed: {e}")
+        health_status["services"]["postgis"] = f"error: {str(e)}"
 
     # Test cache
     if cache.client:

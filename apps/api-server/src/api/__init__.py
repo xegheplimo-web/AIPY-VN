@@ -16,6 +16,7 @@ from .profile import router as profile
 from .categories import router as categories
 from .favorites import router as favorites
 from .store_locator import router as store_locator
+from .geo import router as geo
 
 __all__ = [
     "search",
@@ -36,4 +37,5 @@ __all__ = [
     "categories",
     "favorites",
     "store_locator",
+    "geo",
 ]
