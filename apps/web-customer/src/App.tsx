@@ -12,6 +12,7 @@ const StoreDetailPage = lazy(() => import('./pages/StoreDetailPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
 const DemoPage = lazy(() => import('./pages/DemoPage'));
 const DesignPage = lazy(() => import('./pages/DesignPage'));
+const StoreLocatorPage = lazy(() => import('./pages/StoreLocatorPage'));
 
 function LoadingFallback() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/profile" element={<UserProfilePage />} />
           <Route path="/demo" element={<DemoPage />} />
           <Route path="/design" element={<DesignPage />} />
+          <Route path="/locator" element={<StoreLocatorPage />} />
         </Routes>
         <Toaster position="top-right" richColors />
       </Suspense>
