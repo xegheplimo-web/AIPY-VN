@@ -10,6 +10,8 @@ $env:CORS_ORIGINS = "http://localhost:3000,http://localhost:5173,http://localhos
 $env:RATE_LIMIT_MAX_REQUESTS = "200"
 $env:RATE_LIMIT_WINDOW_SECONDS = "60"
 $env:LOG_LEVEL = "info"
+$env:SERPAPI_KEY = "d3427bacea59fab22364b9586ea3753b99918e695fd138930b655d67d6054b42"
+$env:SERPAPI_ENGINE = "google"
 
 # Chạy uvicorn development server
 uvicorn src.main:app --reload --host 0.0.0.0 --port 8000

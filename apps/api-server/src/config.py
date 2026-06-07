@@ -127,6 +127,18 @@ class StripeConfig(BaseModel):
         return bool(self.secret_key and self.publishable_key)
 
 
+class SerpAPIConfig(BaseModel):
+    """SerpAPI configuration for web search."""
+
+    api_key: str = Field(default="", alias="SERPAPI_KEY")
+    engine: str = Field(default="google", alias="SERPAPI_ENGINE")
+    timeout: int = Field(default=10, alias="SERPAPI_TIMEOUT")
+
+    def is_configured(self) -> bool:
+        """Check if SerpAPI is properly configured."""
+        return bool(self.api_key)
+
+
 class AppConfig(BaseSettings):
     """Application configuration."""
 
@@ -157,6 +169,9 @@ class AppConfig(BaseSettings):
 
     # Stripe
     stripe: StripeConfig = Field(default_factory=StripeConfig)
+
+    # SerpAPI
+    serpapi: SerpAPIConfig = Field(default_factory=SerpAPIConfig)
 
     # JWT
     jwt_access_expire_minutes: int = Field(

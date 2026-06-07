@@ -22,6 +22,10 @@ from src.api import (
     payments,
 )
 from src.api.auth import router as auth_router
+from src.api.reviews import router as reviews
+from src.api.profile import router as profile
+from src.api.categories import router as categories
+from src.api.favorites import router as favorites
 
 # from src.db import init_db  # Using Alembic migrations instead
 from src.middleware import (
@@ -182,12 +186,16 @@ app.include_router(admin, prefix=api_v1_prefix)
 app.include_router(orders, prefix=api_v1_prefix)
 app.include_router(cart, prefix=api_v1_prefix)
 app.include_router(chat, prefix=api_v1_prefix)
-app.include_router(shipping.router, prefix=api_v1_prefix)
-app.include_router(voice.router, prefix=api_v1_prefix)
-app.include_router(notifications.router, prefix=api_v1_prefix)
-app.include_router(tasks.router, prefix=api_v1_prefix)
-app.include_router(payments.router, prefix=api_v1_prefix)
+app.include_router(shipping, prefix=api_v1_prefix)
+app.include_router(voice, prefix=api_v1_prefix)
+app.include_router(notifications, prefix=api_v1_prefix)
+app.include_router(tasks, prefix=api_v1_prefix)
+app.include_router(payments, prefix=api_v1_prefix)
 app.include_router(auth_router, prefix=api_v1_prefix)
+app.include_router(reviews, prefix=api_v1_prefix)
+app.include_router(profile, prefix=api_v1_prefix)
+app.include_router(categories, prefix=api_v1_prefix)
+app.include_router(favorites, prefix=api_v1_prefix)
 
 # Legacy routes (backward compatibility - no prefix)
 app.include_router(search)
@@ -198,12 +206,16 @@ app.include_router(admin)
 app.include_router(orders)
 app.include_router(cart)
 app.include_router(chat)
-app.include_router(shipping.router)
-app.include_router(voice.router)
-app.include_router(notifications.router)
-app.include_router(tasks.router)
-app.include_router(payments.router)
+app.include_router(shipping)
+app.include_router(voice)
+app.include_router(notifications)
+app.include_router(tasks)
+app.include_router(payments)
 app.include_router(auth_router)
+app.include_router(reviews)
+app.include_router(profile)
+app.include_router(categories)
+app.include_router(favorites)
 
 
 @app.get("/health")

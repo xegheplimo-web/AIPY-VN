@@ -28,6 +28,7 @@ dependencies = [
     "celery[redis]",
     "sentry-sdk[fastapi]",
     "stripe",
+    "googlesearch-python",
 ]
 
 [dependency-groups]
