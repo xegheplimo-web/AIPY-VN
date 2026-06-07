@@ -96,6 +96,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: apps/web-customer/package-lock.json
       
       - name: Install dependencies
         working-directory: apps/web-customer
@@ -123,6 +124,44 @@ jobs:
           name: web-customer-build
           path: apps/web-customer/dist
 
+  frontend-owner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web-owner/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: apps/web-owner
+        run: npm ci
+      
+      - name: Run ESLint
+        working-directory: apps/web-owner
+        run: npm run lint
+      
+      - name: Run Prettier check
+        working-directory: apps/web-owner
+        run: npm run format:check
+      
+      - name: Run TypeScript check
+        working-directory: apps/web-owner
+        run: npx tsc --noEmit
+      
+      - name: Build
+        working-directory: apps/web-owner
+        run: npm run build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-owner-build
+          path: apps/web-owner/dist
+
   frontend-admin:
     runs-on: ubuntu-latest
     steps:
@@ -133,6 +172,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: apps/web-admin/package-lock.json
       
       - name: Install dependencies
         working-directory: apps/web-admin
