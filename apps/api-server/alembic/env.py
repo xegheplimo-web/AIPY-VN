@@ -16,6 +16,8 @@ from src.db import Base
 from src.models.store import Store, Product, Category
 from src.models.order import Cart, CartItem, Order, OrderItem, ProductVariant
 from src.models.user import User, Address
+from src.models.chat import Message
+from src.models.review import Review
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
