@@ -1,0 +1,14 @@
+**/node_modules/**
+**/dist/**
+**/build/**
+**/.git/**
+**/target/**
+**/__pycache__/**
+**/vendor/**
+**/.venv/**
+**/.next/**
+**/.nuxt/**
+**/coverage/**
+**/*.min.js
+**/*.min.css
+**/*.map

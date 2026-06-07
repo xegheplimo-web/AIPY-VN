@@ -1,0 +1,15 @@
+[project]
+name = "vietstore-rag"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = ["apps/api-server", "packages/shared-db"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["apps", "packages"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "RUF"]
