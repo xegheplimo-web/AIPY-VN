@@ -123,18 +123,38 @@ async def send_message(data: SendMessageRequest):
         )
 
 
+# In-memory room management (use Redis pub/sub for production multi-instance)
+room_connections: dict[str, list[WebSocket]] = {}
+
+
 @router.websocket("/ws/chat/{store_id}")
 async def websocket_chat(websocket: WebSocket, store_id: str):
-    """WebSocket endpoint for real-time chat.
-
-    TODO: In production, implement proper WebSocket connection management
-    with Redis pub/sub for multi-instance support.
-    """
+    """WebSocket endpoint for real-time chat with room management."""
     await websocket.accept()
+
+    # Join room
+    if store_id not in room_connections:
+        room_connections[store_id] = []
+    room_connections[store_id].append(websocket)
+
     try:
         while True:
             data = await websocket.receive_text()
-            # Echo back for now - full implementation would broadcast to room
-            await websocket.send_text(f"Echo: {data}")
+            # Broadcast to all connections in the room
+            disconnected = []
+            for conn in room_connections.get(store_id, []):
+                try:
+                    await conn.send_text(data)
+                except Exception:
+                    disconnected.append(conn)
+            # Clean up disconnected clients
+            for conn in disconnected:
+                room_connections[store_id].remove(conn)
     except Exception:
         pass
+    finally:
+        # Leave room
+        if store_id in room_connections and websocket in room_connections[store_id]:
+            room_connections[store_id].remove(websocket)
+            if not room_connections[store_id]:
+                del room_connections[store_id]

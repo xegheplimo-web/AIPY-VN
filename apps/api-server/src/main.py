@@ -15,6 +15,7 @@ from src.api import (
     voice,
 )
 from src.db import init_db
+from src.middleware import LoggingMiddleware, setup_error_handlers, RateLimitMiddleware
 
 
 @asynccontextmanager
@@ -30,13 +31,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Production middleware
+app.add_middleware(LoggingMiddleware)
+app.add_middleware(RateLimitMiddleware, max_requests=200, window=60)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:3001",
+        "http://localhost:3002",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Error handlers
+setup_error_handlers(app)
 
 app.include_router(search)
 app.include_router(stores)
