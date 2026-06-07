@@ -34,10 +34,27 @@ if (Get-Command pnpm -ErrorAction SilentlyContinue) {
 }
 
 # Start Docker services
-Write-Host "\n🐳 Starting Docker services..." -ForegroundColor Cyan
+Write-Host "`n🐳 Starting Docker services..." -ForegroundColor Cyan
 docker compose up -d
 
-Write-Host "\n✅ Setup complete!" -ForegroundColor Green
+# Wait for PostgreSQL to be ready
+Write-Host "`n⏳ Waiting for PostgreSQL to be ready..." -ForegroundColor Cyan
+Start-Sleep -Seconds 5
+
+# Run Alembic migrations
+Write-Host "`n🗄️ Running database migrations..." -ForegroundColor Cyan
+cd apps/api-server
+$env:PYTHONPATH = "$PWD\..\.."
+uv run alembic upgrade head
+
+# Seed data
+Write-Host "`n🌱 Seeding database with sample data..." -ForegroundColor Cyan
+$env:PYTHONPATH = "A:\AIPY\vietstore-rag\apps\api-server"
+uv run python src/seed.py
+
+cd ..\..
+
+Write-Host "`n[OK] Setup complete!" -ForegroundColor Green
 Write-Host "Next steps:"
-Write-Host "  1. cd apps/api-server && uv run uvicorn src.main:app --reload"
-Write-Host "  2. cd apps/web-customer && npm run dev"
+Write-Host "  1. .\scripts\run.ps1 -Service backend"
+Write-Host "  2. .\scripts\run.ps1 -Service frontend"

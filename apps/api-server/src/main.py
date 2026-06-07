@@ -27,14 +27,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(search.router)
-app.include_router(stores.router)
-app.include_router(products.router)
-app.include_router(owner.router)
-app.include_router(admin.router)
-app.include_router(orders.router)
-app.include_router(cart.router)
-app.include_router(chat.router)
+app.include_router(search)
+app.include_router(stores)
+app.include_router(products)
+app.include_router(owner)
+app.include_router(admin)
+app.include_router(orders)
+app.include_router(cart)
+app.include_router(chat)
 
 
 @app.get("/health")

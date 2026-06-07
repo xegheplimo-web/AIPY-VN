@@ -54,7 +54,8 @@ vietstore-rag/
 ```bash
 # Backend
 cd apps/api-server
-uv run uvicorn src.main:app --reload --port 8000
+$env:PYTHONPATH="A:\AIPY\vietstore-rag\apps\api-server"
+uv run uvicorn src.main:app --reload --port 9000
 
 # Frontend
 cd apps/web-customer

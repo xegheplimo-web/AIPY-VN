@@ -45,7 +45,7 @@ Nền tảng thương mại điện tử kết hợp AI tìm kiếm sản phẩm
 
 ### API Documentation
 
-Sau khi chạy backend, truy cập: http://localhost:8000/docs
+Sau khi chạy backend, truy cập: http://127.0.0.1:9000/docs
 
 ## Cấu trúc dự án
 
