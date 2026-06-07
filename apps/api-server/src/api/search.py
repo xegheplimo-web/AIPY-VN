@@ -1,13 +1,20 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import math
+
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
+from src.db import async_session
+from src.models.store import Store, Product
+from src.services.geo import haversine_distance
 
 router = APIRouter(prefix="/api", tags=["Search"])
 
 
 class ChatSearchRequest(BaseModel):
-    query: str = Field(..., min_length=1, description="Câu hỏi/từ khóa tìm kiếm")
+    query: str = Field(..., min_length=1, description="Cau hoi/tu khoa tim kiem")
     location: Optional[dict] = Field(None, description={"lat": float, "lng": float})
     radius_km: float = Field(default=5.0, ge=0.1, le=50.0)
     limit: int = Field(default=10, ge=1, le=50)
@@ -41,83 +48,120 @@ class ChatSearchResponse(BaseModel):
     total_found: int
 
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    R = 6371e3
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-    a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-
 @router.post("/chat/search", response_model=ChatSearchResponse)
 async def chat_search(req: ChatSearchRequest):
-    # Mock data for demonstration
-    stores = [
-        StoreResult(
-            id="store_001",
-            name="Nhà thuốc An Khang",
-            address="123 Nguyễn Trãi, Phường Bến Thành, Quận 1",
-            latitude=10.776912,
-            longitude=106.700934,
-            distance_m=350,
-            industry="Bán lẻ dược phẩm",
-            products=[
-                ProductResult(
-                    id="p_123",
-                    name="Panadol Extra 500mg",
-                    price=35000,
-                    stock=12,
-                    in_stock=True,
-                    shelf_location="Kệ A1, Tầng 1",
-                    category="Thuốc giảm đau"
-                )
-            ],
-            map_url="https://www.google.com/maps/dir/?api=1&destination=10.776912,106.700934&q=Nhà+thuốc+An+Khang"
-        ),
-        StoreResult(
-            id="store_002",
-            name="Nhà thuốc ABC",
-            address="456 Lê Lợi, Quận 1",
-            latitude=10.775123,
-            longitude=106.701234,
-            distance_m=680,
-            industry="Bán lẻ dược phẩm",
-            products=[
-                ProductResult(
-                    id="p_124",
-                    name="Panadol Extra 500mg",
-                    price=33000,
-                    stock=5,
-                    in_stock=True,
-                    shelf_location="Kệ B2, Tầng 1",
-                    category="Thuốc giảm đau"
-                )
-            ],
-            map_url="https://www.google.com/maps/dir/?api=1&destination=10.775123,106.701234&q=Nhà+thuốc+ABC"
+    async with async_session() as session:
+        # 1. Find products matching query (case-insensitive)
+        search_term = f"%{req.query}%"
+        stmt = (
+            select(Product)
+            .where(Product.name.ilike(search_term))
+            .where(Product.stock > 0)
+            .where(Product.status == "active")
+            .options(selectinload(Product.store))
         )
-    ]
+        result = await session.execute(stmt)
+        products = result.scalars().all()
 
-    summary = f"✅ Tìm thấy {len(stores)} cửa hàng có '{req.query}' gần bạn"
-    if stores and stores[0].distance_m and stores[0].distance_m < 500:
-        summary += f" • Gần nhất chỉ {stores[0].distance_m}m 🎯"
-    summary += ". Nhấn vào cửa hàng để xem chi tiết!"
+        # 2. Group products by store
+        store_products = {}
+        for p in products:
+            store_id = str(p.store_id)
+            if store_id not in store_products:
+                store_products[store_id] = {"store": p.store, "products": []}
+            store_products[store_id]["products"].append(p)
 
-    return ChatSearchResponse(
-        summary=summary,
-        stores=stores,
-        total_found=len(stores)
-    )
+        # 3. Calculate distance and filter by radius
+        stores_result = []
+        user_lat = req.location.get("lat") if req.location else None
+        user_lng = req.location.get("lng") if req.location else None
+
+        for store_id, data in store_products.items():
+            store = data["store"]
+            distance_m = None
+
+            if user_lat is not None and user_lng is not None:
+                distance_m = haversine_distance(
+                    user_lat, user_lng, store.latitude, store.longitude
+                )
+                # Filter by radius
+                if distance_m > req.radius_km * 1000:
+                    continue
+
+            # Build product results
+            product_results = []
+            for p in data["products"]:
+                product_results.append(
+                    ProductResult(
+                        id=str(p.id),
+                        name=p.name,
+                        price=float(p.price) if p.price else None,
+                        stock=p.stock,
+                        in_stock=p.stock > 0,
+                        shelf_location=p.shelf_location or "",
+                        category=None,  # Can be added later
+                    )
+                )
+
+            # Build map URL
+            encoded_name = store.name.replace(" ", "+")
+            map_url = f"https://www.google.com/maps/dir/?api=1&destination={store.latitude},{store.longitude}&q={encoded_name}"
+
+            stores_result.append(
+                StoreResult(
+                    id=str(store.id),
+                    name=store.name,
+                    address=store.address,
+                    latitude=store.latitude,
+                    longitude=store.longitude,
+                    distance_m=round(distance_m, 1) if distance_m is not None else None,
+                    industry=store.industry,
+                    products=product_results,
+                    map_url=map_url,
+                )
+            )
+
+        # 4. Sort by distance (nearest first)
+        stores_result.sort(key=lambda x: x.distance_m if x.distance_m else float("inf"))
+
+        # 5. Apply limit
+        stores_result = stores_result[: req.limit]
+
+        # 6. Build summary
+        total = len(stores_result)
+        if total == 0:
+            summary = f"Khong tim thay '{req.query}' trong ban kinh {req.radius_km}km. Ban thu tim tu khoa khac nhe!"
+        else:
+            summary = f"Tim thay {total} cua hang co '{req.query}' gan ban"
+            if stores_result[0].distance_m and stores_result[0].distance_m < 500:
+                summary += f" • Gan nhat chi {stores_result[0].distance_m}m"
+            summary += ". Nhan vao cua hang de xem chi tiet!"
+
+        return ChatSearchResponse(
+            summary=summary, stores=stores_result, total_found=total
+        )
 
 
 @router.get("/suggestions")
 async def get_suggestions(q: str, limit: int = 5):
-    suggestions = [
-        "Panadol giảm đau",
-        "Panadol Extra 500mg",
-        "Vitamin C",
-        "Khẩu trang y tế",
-        "Nước rửa tay"
-    ]
-    return {"suggestions": [s for s in suggestions if q.lower() in s.lower()][:limit]}
+    async with async_session() as session:
+        stmt = (
+            select(Product.name)
+            .where(Product.name.ilike(f"%{q}%"))
+            .where(Product.stock > 0)
+            .limit(limit * 3)
+        )
+        result = await session.execute(stmt)
+        names = [row[0] for row in result.all()]
+
+        # Return unique names
+        seen = set()
+        unique = []
+        for name in names:
+            if name not in seen:
+                seen.add(name)
+                unique.append(name)
+                if len(unique) >= limit:
+                    break
+
+        return {"suggestions": unique}
