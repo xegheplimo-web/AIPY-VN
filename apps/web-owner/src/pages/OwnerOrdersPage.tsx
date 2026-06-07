@@ -1,5 +1,7 @@
+import { type ColumnDef } from '@tanstack/react-table';
+import { Check, Truck, X } from 'lucide-react';
 import { useState } from 'react';
-import { Check, X, Truck } from 'lucide-react';
+import { DataTable } from '../components/ui/DataTable';
 
 interface Order {
   id: string;
@@ -34,6 +36,94 @@ export default function OwnerOrdersPage() {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
   };
 
+  const columns: ColumnDef<Order>[] = [
+    {
+      accessorKey: 'order_number',
+      header: 'Ma don hang',
+      cell: ({ row }) => <div className="font-medium">{row.getValue('order_number')}</div>,
+    },
+    {
+      accessorKey: 'customer',
+      header: 'Khach hang',
+    },
+    {
+      accessorKey: 'date',
+      header: 'Ngay dat',
+    },
+    {
+      accessorKey: 'items',
+      header: 'San pham',
+      cell: ({ row }) => (
+        <div className="text-sm text-gray-600 max-w-xs truncate">
+          {row.getValue('items').join(', ')}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'total',
+      header: 'Tong tien',
+      cell: ({ row }) => (
+        <div className="font-bold text-blue-600">{row.getValue('total')}đ</div>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Trang thai',
+      cell: ({ row }) => (
+        <span className={`text-xs px-2 py-1 rounded-full ${
+          row.getValue('status') === 'completed' ? 'bg-green-100 text-green-700' :
+          row.getValue('status') === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+          'bg-blue-100 text-blue-700'
+        }`}>
+          {STATUS_LABELS[row.getValue('status')]}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Hanh dong',
+      cell: ({ row }) => {
+        const status = row.getValue('status');
+        return (
+          <div className="flex gap-2">
+            {status === 'pending' && (
+              <>
+                <button 
+                  onClick={() => updateStatus(row.original.id, 'confirmed')} 
+                  className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg flex items-center gap-1"
+                >
+                  <Check className="w-4 h-4" /> Chap nhan
+                </button>
+                <button 
+                  onClick={() => updateStatus(row.original.id, 'cancelled')} 
+                  className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg flex items-center gap-1"
+                >
+                  <X className="w-4 h-4" /> Tu choi
+                </button>
+              </>
+            )}
+            {status === 'confirmed' && (
+              <button 
+                onClick={() => updateStatus(row.original.id, 'preparing')} 
+                className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg flex items-center gap-1"
+              >
+                <Truck className="w-4 h-4" /> Bat dau chuan bi
+              </button>
+            )}
+            {status === 'preparing' && (
+              <button 
+                onClick={() => updateStatus(row.original.id, 'ready')} 
+                className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg"
+              >
+                San sang giao
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-5xl mx-auto">
@@ -53,51 +143,7 @@ export default function OwnerOrdersPage() {
           ))}
         </div>
 
-        <div className="space-y-3">
-          {filtered.map((order) => (
-            <div key={order.id} className="bg-white rounded-xl p-4 shadow-sm border">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <p className="font-bold">{order.order_number}</p>
-                  <p className="text-sm text-gray-500">{order.customer} • {order.date}</p>
-                </div>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  order.status === 'completed' ? 'bg-green-100 text-green-700' :
-                  order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-blue-100 text-blue-700'
-                }`}>
-                  {STATUS_LABELS[order.status]}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{order.items.join(', ')}</p>
-              <div className="flex justify-between items-center">
-                <p className="font-bold text-blue-600">{order.total}đ</p>
-                <div className="flex gap-2">
-                  {order.status === 'pending' && (
-                    <>
-                      <button onClick={() => updateStatus(order.id, 'confirmed')} className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg flex items-center gap-1">
-                        <Check className="w-4 h-4" /> Chap nhan
-                      </button>
-                      <button onClick={() => updateStatus(order.id, 'cancelled')} className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg flex items-center gap-1">
-                        <X className="w-4 h-4" /> Tu choi
-                      </button>
-                    </>
-                  )}
-                  {order.status === 'confirmed' && (
-                    <button onClick={() => updateStatus(order.id, 'preparing')} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg flex items-center gap-1">
-                      <Truck className="w-4 h-4" /> Bat dau chuan bi
-                    </button>
-                  )}
-                  {order.status === 'preparing' && (
-                    <button onClick={() => updateStatus(order.id, 'ready')} className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg">
-                      San sang giao
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <DataTable columns={columns} data={filtered} searchKey="order_number" />
       </div>
     </div>
   );

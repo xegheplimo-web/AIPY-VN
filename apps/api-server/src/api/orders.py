@@ -1,9 +1,10 @@
 import uuid
 import random
+import base64
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -11,8 +12,13 @@ from sqlalchemy.orm import selectinload
 from src.db import async_session
 from src.models.store import Product
 from src.models.order import Cart, CartItem, Order, OrderItem
+from src.services.ecc import get_request_signer, get_ecc_service
+from src.middleware.auth_middleware import require_auth
 
 router = APIRouter(prefix="/api", tags=["Orders"])
+
+# Constants
+HIGH_VALUE_ORDER_THRESHOLD = 1000000  # Orders over 1M VND require signature
 
 
 class OrderItemRequest(BaseModel):
@@ -34,6 +40,9 @@ class CreateOrderRequest(BaseModel):
     discount: float = 0
     total_amount: float
     payment_method: str = Field(default="cash")
+    # Optional request signature for sensitive operations
+    signature: Optional[str] = None
+    timestamp: Optional[str] = None
 
 
 class OrderItemResponse(BaseModel):
@@ -85,72 +94,178 @@ def generate_order_number():
     return f"ORD-{now.strftime('%Y')}-{random_num:05d}"
 
 
-@router.post("/orders", response_model=OrderResponse)
-async def create_order(data: CreateOrderRequest, user_id: Optional[str] = None):
-    async with async_session() as session:
-        # Verify all products exist and have enough stock
-        for item in data.items:
-            product_stmt = select(Product).where(
-                Product.id == uuid.UUID(item.product_id)
+async def verify_order_signature(
+    data: CreateOrderRequest,
+    signature: Optional[str],
+    timestamp: Optional[str],
+) -> bool:
+    """
+    Verify request signature for high-value orders.
+
+    Args:
+        data: Order request data
+        signature: Request signature
+        timestamp: Request timestamp
+
+    Returns:
+        True if signature is valid or not required, False otherwise
+    """
+    # Low-value orders don't require signature
+    if data.total_amount <= HIGH_VALUE_ORDER_THRESHOLD:
+        return True
+
+    # High-value orders require signature
+    if not signature or not timestamp:
+        return False
+
+    # Verify signature using ECDSA
+    request_signer = get_request_signer()
+    body = data.model_dump_json()
+    is_valid = request_signer.verify_request(
+        signature=signature,
+        method="POST",
+        path="/api/orders",
+        body=body,
+        timestamp=timestamp,
+    )
+
+    return is_valid
+
+
+async def verify_product_stock(session, items: List[OrderItemRequest]) -> None:
+    """
+    Verify all products exist and have enough stock.
+
+    Args:
+        session: Database session
+        items: List of order items
+
+    Raises:
+        HTTPException: If product not found or insufficient stock
+    """
+    for item in items:
+        product_stmt = select(Product).where(Product.id == uuid.UUID(item.product_id))
+        product_result = await session.execute(product_stmt)
+        product = product_result.scalar_one_or_none()
+
+        if not product:
+            raise HTTPException(
+                status_code=404, detail=f"Product {item.product_id} not found"
             )
-            product_result = await session.execute(product_stmt)
-            product = product_result.scalar_one_or_none()
 
-            if not product:
-                raise HTTPException(
-                    status_code=404, detail=f"Product {item.product_id} not found"
-                )
+        if product.stock < item.quantity:
+            raise HTTPException(
+                status_code=400, detail=f"Not enough stock for {product.name}"
+            )
 
-            if product.stock < item.quantity:
-                raise HTTPException(
-                    status_code=400, detail=f"Not enough stock for {product.name}"
-                )
 
-        # Create order
-        order = Order(
+async def create_order_record(
+    session,
+    data: CreateOrderRequest,
+    user_id: str,
+) -> Order:
+    """
+    Create order record in database.
+
+    Args:
+        session: Database session
+        data: Order request data
+        user_id: User ID
+
+    Returns:
+        Created Order object
+    """
+    order = Order(
+        id=uuid.uuid4(),
+        order_number=generate_order_number(),
+        user_id=uuid.UUID(user_id) if user_id else None,
+        store_id=uuid.UUID(data.store_id),
+        delivery_method=data.delivery_method,
+        delivery_address=data.delivery_address,
+        delivery_lat=data.delivery_lat,
+        delivery_lng=data.delivery_lng,
+        subtotal=data.subtotal,
+        shipping_fee=data.shipping_fee,
+        discount=data.discount,
+        total_amount=data.total_amount,
+        payment_method=data.payment_method,
+        payment_status="pending",
+        status="pending",
+        created_at=datetime.now().isoformat(),
+    )
+    session.add(order)
+    await session.flush()
+    return order
+
+
+async def create_order_items(
+    session,
+    order: Order,
+    items: List[OrderItemRequest],
+) -> List[OrderItem]:
+    """
+    Create order items and update product stock.
+
+    Args:
+        session: Database session
+        order: Order object
+        items: List of order items
+
+    Returns:
+        List of created OrderItem objects
+    """
+    order_items = []
+    for item in items:
+        product_stmt = select(Product).where(Product.id == uuid.UUID(item.product_id))
+        product_result = await session.execute(product_stmt)
+        product = product_result.scalar_one()
+
+        # Decrease stock
+        product.stock -= item.quantity
+
+        order_item = OrderItem(
             id=uuid.uuid4(),
-            order_number=generate_order_number(),
-            user_id=uuid.UUID(user_id) if user_id else None,
-            store_id=uuid.UUID(data.store_id),
-            delivery_method=data.delivery_method,
-            delivery_address=data.delivery_address,
-            delivery_lat=data.delivery_lat,
-            delivery_lng=data.delivery_lng,
-            subtotal=data.subtotal,
-            shipping_fee=data.shipping_fee,
-            discount=data.discount,
-            total_amount=data.total_amount,
-            payment_method=data.payment_method,
-            payment_status="pending",
-            status="pending",
-            created_at=datetime.now().isoformat(),
+            order_id=order.id,
+            product_id=uuid.UUID(item.product_id),
+            variant_id=uuid.UUID(item.variant_id) if item.variant_id else None,
+            quantity=item.quantity,
+            unit_price=item.unit_price,
+            subtotal=item.unit_price * item.quantity,
         )
-        session.add(order)
-        await session.flush()
+        session.add(order_item)
+        order_items.append(order_item)
+
+    return order_items
+
+
+@router.post("/orders", response_model=OrderResponse)
+async def create_order(
+    data: CreateOrderRequest,
+    current_user: dict = Depends(require_auth),
+    x_signature: Optional[str] = Header(None, alias="X-Signature"),
+    x_timestamp: Optional[str] = Header(None, alias="X-Timestamp"),
+):
+    async with async_session() as session:
+        # Get user_id from authenticated user
+        user_id = current_user.get("id")
+
+        # Verify signature
+        signature = data.signature or x_signature
+        timestamp = data.timestamp or x_timestamp
+        if not await verify_order_signature(data, signature, timestamp):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or missing signature for high-value order",
+            )
+
+        # Verify product stock
+        await verify_product_stock(session, data.items)
+
+        # Create order record
+        order = await create_order_record(session, data, user_id)
 
         # Create order items and update stock
-        order_items = []
-        for item in data.items:
-            product_stmt = select(Product).where(
-                Product.id == uuid.UUID(item.product_id)
-            )
-            product_result = await session.execute(product_stmt)
-            product = product_result.scalar_one()
-
-            # Decrease stock
-            product.stock -= item.quantity
-
-            order_item = OrderItem(
-                id=uuid.uuid4(),
-                order_id=order.id,
-                product_id=uuid.UUID(item.product_id),
-                variant_id=uuid.UUID(item.variant_id) if item.variant_id else None,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                subtotal=item.unit_price * item.quantity,
-            )
-            session.add(order_item)
-            order_items.append(order_item)
+        order_items = await create_order_items(session, order, data.items)
 
         await session.commit()
 

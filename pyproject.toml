@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.11"
 
 [tool.uv.workspace]
-members = ["apps/api-server", "packages/shared-db"]
+members = ["apps/api-server", "packages/shared-db", "packages/shared-utils", "packages/shared-ui"]
 
 [tool.ruff]
 line-length = 88

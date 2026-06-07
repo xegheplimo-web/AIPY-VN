@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Text, ForeignKey
+from sqlalchemy import Column, String, Boolean, Text, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -18,8 +18,16 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     last_login_at = Column(String)
+    fcm_token = Column(String(500))  # Firebase Cloud Messaging token
+    fcm_platform = Column(String(20))  # Platform: web, ios, android
     created_at = Column(String, default="now()")
     updated_at = Column(String, default="now()")
+
+    __table_args__ = (
+        Index("idx_user_email", "email"),
+        Index("idx_user_role", "role"),
+        Index("idx_user_is_active", "is_active"),
+    )
 
 
 class Address(Base):

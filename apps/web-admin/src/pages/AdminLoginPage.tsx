@@ -1,6 +1,7 @@
+import { Eye, EyeOff, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Eye, EyeOff } from 'lucide-react';
+import api from '../services/api';
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -8,14 +9,32 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError('');
+
+    try {
+      const res = await api.post('/api/auth/login', {
+        email,
+        password,
+      });
+
+      // Verify admin role
+      if (res.data.user.role !== 'admin') {
+        throw new Error('Access denied: Admin role required');
+      }
+
+      localStorage.setItem('token', res.data.access_token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
       navigate('/dashboard');
-    }, 1000);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -28,6 +47,12 @@ export default function AdminLoginPage() {
         </div>
         <h1 className="text-2xl font-bold text-center mb-2">Admin Dashboard</h1>
         <p className="text-gray-500 text-center mb-6">Dang nhap quan tri he thong</p>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

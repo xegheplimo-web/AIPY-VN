@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Search, Edit2, Trash2, Upload } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
+import { Edit2, Plus, Trash2, Upload } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { DataTable } from '../components/ui/DataTable';
 import api from '../services/api';
 
 interface Product {
@@ -14,7 +15,6 @@ interface Product {
 
 export default function ProductManagementPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [form, setForm] = useState({ name: '', price: '', stock: '0', unit: 'cai', barcode: '', brand: '', shelf_location: '' });
 
@@ -60,7 +60,63 @@ export default function ProductManagementPage() {
     }
   };
 
-  const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  const columns: ColumnDef<Product>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Ten san pham',
+      cell: ({ row }) => <div className="font-medium">{row.getValue('name')}</div>,
+    },
+    {
+      accessorKey: 'price',
+      header: 'Gia',
+      cell: ({ row }) => (
+        <div className="text-right">
+          {row.getValue('price') ? `${Number(row.getValue('price')).toLocaleString('vi-VN')}đ` : '-'}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'stock',
+      header: 'Ton kho',
+      cell: ({ row }) => (
+        <div className={`text-right ${row.getValue('stock') < 10 ? 'text-red-600 font-medium' : ''}`}>
+          {row.getValue('stock')}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Trang thai',
+      cell: ({ row }) => (
+        <div className="text-center">
+          <span className={`text-xs px-2 py-1 rounded-full ${
+            row.getValue('status') === 'active' 
+              ? 'bg-green-100 text-green-700' 
+              : 'bg-gray-100 text-gray-600'
+          }`}>
+            {row.getValue('status')}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Hanh dong',
+      cell: ({ row }) => (
+        <div className="text-right">
+          <button className="p-2 hover:bg-gray-200 rounded-lg mr-1">
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => handleDelete(row.original.id)} 
+            className="p-2 hover:bg-red-100 text-red-600 rounded-lg"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="min-h-screen p-4">
@@ -77,49 +133,7 @@ export default function ProductManagementPage() {
           </div>
         </div>
 
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tim kiem san pham..."
-            className="w-full pl-10 pr-4 py-3 border rounded-xl"
-          />
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium">Ten san pham</th>
-                <th className="px-4 py-3 text-right text-sm font-medium">Gia</th>
-                <th className="px-4 py-3 text-right text-sm font-medium">Ton kho</th>
-                <th className="px-4 py-3 text-center text-sm font-medium">Trang thai</th>
-                <th className="px-4 py-3 text-right text-sm font-medium">Hanh dong</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filtered.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{product.name}</td>
-                  <td className="px-4 py-3 text-right">{product.price?.toLocaleString('vi-VN')}đ</td>
-                  <td className="px-4 py-3 text-right">
-                    <span className={product.stock < 10 ? 'text-red-600 font-medium' : ''}>{product.stock}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`text-xs px-2 py-1 rounded-full ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {product.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button className="p-2 hover:bg-gray-200 rounded-lg mr-1"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => handleDelete(product.id)} className="p-2 hover:bg-red-100 text-red-600 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable columns={columns} data={products} searchKey="name" />
 
         {/* Add Product Modal */}
         {showAddModal && (

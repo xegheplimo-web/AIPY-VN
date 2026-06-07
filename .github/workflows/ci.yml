@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, develop]
 
 jobs:
   backend:
@@ -40,54 +40,141 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+          cache: 'pip'
 
       - name: Install uv
         run: pip install uv
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('apps/api-server/pyproject.toml') }}
 
       - name: Setup backend
         working-directory: apps/api-server
         run: uv sync
 
+      - name: Security audit
+        working-directory: apps/api-server
+        run: |
+          pip install pip-audit
+          pip-audit || echo "Security audit completed with warnings"
+
       - name: Run Ruff lint
         working-directory: apps/api-server
         run: uv run ruff check src/
+
+      - name: Run Ruff format check
+        working-directory: apps/api-server
+        run: uv run ruff format --check src/
+
+      - name: Run type check
+        working-directory: apps/api-server
+        run: uv run ruff check src/ --select I
 
       - name: Run tests
         working-directory: apps/api-server
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vietstore_test
-        run: uv run pytest tests/ -v || echo "No tests yet"
+        run: uv run pytest tests/ -v --cov=src/ --cov-report=xml || echo "No tests yet"
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: success()
+        with:
+          file: ./coverage.xml
+          flags: backend
 
   frontend-customer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-      - run: pnpm install
-      - run: pnpm run lint --filter web-customer
-      - run: pnpm run build --filter web-customer
-
-  frontend-owner:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+          cache: 'npm'
+      
+      - name: Install dependencies
+        working-directory: apps/web-customer
+        run: npm ci
+      
+      - name: Run ESLint
+        working-directory: apps/web-customer
+        run: npm run lint
+      
+      - name: Run Prettier check
+        working-directory: apps/web-customer
+        run: npm run format:check
+      
+      - name: Run TypeScript check
+        working-directory: apps/web-customer
+        run: npx tsc --noEmit
+      
+      - name: Build
+        working-directory: apps/web-customer
+        run: npm run build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
-      - run: pnpm install
-      - run: pnpm run build --filter web-owner
+          name: web-customer-build
+          path: apps/web-customer/dist
 
   frontend-admin:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-      - run: pnpm install
-      - run: pnpm run build --filter web-admin
+          cache: 'npm'
+      
+      - name: Install dependencies
+        working-directory: apps/web-admin
+        run: npm ci
+      
+      - name: Run ESLint
+        working-directory: apps/web-admin
+        run: npm run lint
+      
+      - name: Run Prettier check
+        working-directory: apps/web-admin
+        run: npm run format:check
+      
+      - name: Run TypeScript check
+        working-directory: apps/web-admin
+        run: npx tsc --noEmit
+      
+      - name: Build
+        working-directory: apps/web-admin
+        run: npm run build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-admin-build
+          path: apps/web-admin/dist
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

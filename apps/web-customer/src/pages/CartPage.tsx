@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { ArrowLeft, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react';
 import api from '../services/api';
 
 interface CartItem {
@@ -114,6 +114,7 @@ export default function CartPage() {
                 <button
                   onClick={() => updateQuantity(item.id, item.quantity - 1)}
                   className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg hover:bg-gray-200"
+                  aria-label="Giảm số lượng"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
@@ -121,12 +122,14 @@ export default function CartPage() {
                 <button
                   onClick={() => updateQuantity(item.id, item.quantity + 1)}
                   className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg hover:bg-gray-200"
+                  aria-label="Tăng số lượng"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => removeItem(item.id)}
                   className="ml-auto p-2 text-red-500 hover:text-red-700"
+                  aria-label="Xóa sản phẩm khỏi giỏ hàng"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>

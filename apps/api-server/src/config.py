@@ -1,0 +1,228 @@
+"""
+Configuration validation and management.
+
+Validates required environment variables and provides configuration access.
+"""
+
+import os
+from typing import Optional
+from pydantic import BaseModel, Field, validator
+from pydantic_settings import BaseSettings
+
+
+class DatabaseConfig(BaseModel):
+    """Database configuration."""
+
+    url: str = Field(
+        default="postgresql+asyncpg://username:password@localhost:5432/vietstore"
+    )
+
+    @validator("url")
+    def validate_database_url(cls, v):
+        if not v or "username:password" in v:
+            raise ValueError(
+                "DATABASE_URL must be set with actual credentials (not username:password)"
+            )
+        return v
+
+
+class RedisConfig(BaseModel):
+    """Redis configuration."""
+
+    url: str = Field(default="redis://localhost:6379/0")
+    enabled: bool = Field(default=True)
+
+
+class QdrantConfig(BaseModel):
+    """Qdrant vector database configuration."""
+
+    url: str = Field(default="http://localhost:6333")
+    api_key: Optional[str] = Field(default=None)
+    collection: str = Field(default="vietstore_products")
+    vector_size: int = Field(default=384)
+
+
+class ECCConfig(BaseModel):
+    """ECC cryptography configuration."""
+
+    private_key_pem: Optional[str] = Field(default=None, alias="ECC_PRIVATE_KEY_PEM")
+
+    @validator("private_key_pem")
+    def validate_ecc_key(cls, v):
+        if v and not v.startswith("-----BEGIN"):
+            raise ValueError("ECC_PRIVATE_KEY_PEM must be a valid PEM format")
+        return v
+
+
+class OllamaConfig(BaseModel):
+    """Ollama cloud configuration."""
+
+    cloud_api_key: Optional[str] = Field(default=None, alias="OLLAMA_CLOUD_API_KEY")
+    cloud_url: str = Field(default="https://api.ollama.com", alias="OLLAMA_CLOUD_URL")
+    default_model: str = Field(default="qwen3.5:cloud", alias="OLLAMA_DEFAULT_MODEL")
+    cloud_models: str = Field(
+        default="minimax-m3:cloud,kimi-k2.6:cloud,glm-5.1:cloud,qwen3.5:cloud,nemotron-3-super:cloud,gemma4-31b-cloud",
+        alias="OLLAMA_CLOUD_MODELS",
+    )
+    timeout: int = Field(default=30, alias="OLLAMA_TIMEOUT")
+
+    @validator("cloud_api_key")
+    def validate_api_key(cls, v):
+        if v and not v.startswith("sk-"):
+            raise ValueError("OLLAMA_CLOUD_API_KEY must start with 'sk-'")
+        return v
+
+
+class FirebaseConfig(BaseModel):
+    """Firebase configuration for push notifications."""
+
+    project_id: str = Field(default="", alias="FIREBASE_PROJECT_ID")
+    private_key_id: str = Field(default="", alias="FIREBASE_PRIVATE_KEY_ID")
+    private_key: str = Field(default="", alias="FIREBASE_PRIVATE_KEY")
+    client_email: str = Field(default="", alias="FIREBASE_CLIENT_EMAIL")
+    client_id: str = Field(default="", alias="FIREBASE_CLIENT_ID")
+    auth_uri: str = Field(
+        default="https://accounts.google.com/o/oauth2/auth", alias="FIREBASE_AUTH_URI"
+    )
+    token_uri: str = Field(
+        default="https://oauth2.googleapis.com/token", alias="FIREBASE_TOKEN_URI"
+    )
+    auth_provider_x509_cert_url: str = Field(
+        default="https://www.googleapis.com/oauth2/v1/certs",
+        alias="FIREBASE_AUTH_PROVIDER_X509_CERT_URL",
+    )
+    client_x509_cert_url: str = Field(default="", alias="FIREBASE_CLIENT_X509_CERT_URL")
+
+    def is_configured(self) -> bool:
+        """Check if Firebase is properly configured."""
+        return bool(self.project_id and self.private_key and self.client_email)
+
+
+class SentryConfig(BaseModel):
+    """Sentry configuration for error tracking."""
+
+    dsn: str = Field(default="", alias="SENTRY_DSN")
+    environment: str = Field(default="development", alias="SENTRY_ENVIRONMENT")
+    sample_rate: float = Field(default=1.0, alias="SENTRY_SAMPLE_RATE")
+    traces_sample_rate: float = Field(default=0.1, alias="SENTRY_TRACES_SAMPLE_RATE")
+    profiles_sample_rate: float = Field(
+        default=0.1, alias="SENTRY_PROFILES_SAMPLE_RATE"
+    )
+
+    def is_configured(self) -> bool:
+        """Check if Sentry is properly configured."""
+        return bool(self.dsn)
+
+
+class StripeConfig(BaseModel):
+    """Stripe configuration for payment processing."""
+
+    secret_key: str = Field(default="", alias="STRIPE_SECRET_KEY")
+    publishable_key: str = Field(default="", alias="STRIPE_PUBLISHABLE_KEY")
+    webhook_secret: str = Field(default="", alias="STRIPE_WEBHOOK_SECRET")
+    currency: str = Field(default="usd", alias="STRIPE_CURRENCY")
+
+    def is_configured(self) -> bool:
+        """Check if Stripe is properly configured."""
+        return bool(self.secret_key and self.publishable_key)
+
+
+class AppConfig(BaseSettings):
+    """Application configuration."""
+
+    # Environment
+    environment: str = Field(default="development", alias="ENVIRONMENT")
+    debug: bool = Field(default=True, alias="DEBUG")
+
+    # Database
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+
+    # Redis
+    redis: RedisConfig = Field(default_factory=RedisConfig)
+
+    # Qdrant
+    qdrant: QdrantConfig = Field(default_factory=QdrantConfig)
+
+    # ECC
+    ecc: ECCConfig = Field(default_factory=ECCConfig)
+
+    # Ollama Cloud
+    ollama: OllamaConfig = Field(default_factory=OllamaConfig)
+
+    # Firebase
+    firebase: FirebaseConfig = Field(default_factory=FirebaseConfig)
+
+    # Sentry
+    sentry: SentryConfig = Field(default_factory=SentryConfig)
+
+    # Stripe
+    stripe: StripeConfig = Field(default_factory=StripeConfig)
+
+    # JWT
+    jwt_access_expire_minutes: int = Field(
+        default=60, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES"
+    )
+    jwt_refresh_expire_days: int = Field(
+        default=7, alias="JWT_REFRESH_TOKEN_EXPIRE_DAYS"
+    )
+
+    # CORS
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://localhost:5173,http://localhost:3001,http://localhost:3002",
+        alias="CORS_ORIGINS",
+    )
+
+    # Rate limiting
+    rate_limit_max_requests: int = Field(default=200, alias="RATE_LIMIT_MAX_REQUESTS")
+    rate_limit_window_seconds: int = Field(
+        default=60, alias="RATE_LIMIT_WINDOW_SECONDS"
+    )
+
+    # Logging
+    log_level: str = Field(default="info", alias="LOG_LEVEL")
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+        extra = "allow"  # Allow extra fields like LOG_LEVEL
+
+    @validator("environment")
+    def validate_environment(cls, v):
+        allowed = ["development", "staging", "production"]
+        if v not in allowed:
+            raise ValueError(f"ENVIRONMENT must be one of {allowed}")
+        return v
+
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production."""
+        return self.environment == "production"
+
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development."""
+        return self.environment == "development"
+
+
+# Global config instance
+config = AppConfig()
+
+
+def validate_config() -> None:
+    """
+    Validate all required configuration.
+
+    Raises:
+        ValueError: If required configuration is missing or invalid
+    """
+    if config.is_production:
+        if not config.ecc.private_key_pem:
+            raise ValueError("ECC_PRIVATE_KEY_PEM must be set in production")
+
+        if "username:password" in config.database.url:
+            raise ValueError(
+                "DATABASE_URL must be set with actual credentials in production"
+            )
+
+        if not config.qdrant.api_key:
+            print("WARNING: QDRANT_API_KEY not set in production")

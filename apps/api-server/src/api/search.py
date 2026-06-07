@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import math
+import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -11,6 +12,14 @@ from src.models.store import Store, Product
 from src.services.geo import haversine_distance
 
 router = APIRouter(prefix="/api", tags=["Search"])
+
+
+def sanitize_search_term(term: str) -> str:
+    """Remove potentially dangerous characters from search term"""
+    # Remove special SQL characters and limit length
+    sanitized = re.sub(r"[;'\"]", "", term)
+    # Limit to 200 characters to prevent DoS
+    return sanitized[:200]
 
 
 class ChatSearchRequest(BaseModel):
@@ -52,7 +61,7 @@ class ChatSearchResponse(BaseModel):
 async def chat_search(req: ChatSearchRequest):
     async with async_session() as session:
         # 1. Find products matching query (case-insensitive)
-        search_term = f"%{req.query}%"
+        search_term = f"%{sanitize_search_term(req.query)}%"
         stmt = (
             select(Product)
             .where(Product.name.ilike(search_term))
@@ -73,8 +82,22 @@ async def chat_search(req: ChatSearchRequest):
 
         # 3. Calculate distance and filter by radius
         stores_result = []
-        user_lat = req.location.get("lat") if req.location else None
-        user_lng = req.location.get("lng") if req.location else None
+        user_lat = None
+        user_lng = None
+
+        if req.location:
+            if not isinstance(req.location, dict):
+                raise HTTPException(status_code=422, detail="Location must be a dict")
+            user_lat = req.location.get("lat")
+            user_lng = req.location.get("lng")
+
+            if user_lat is None or user_lng is None:
+                raise HTTPException(
+                    status_code=422, detail="Location must include lat and lng"
+                )
+
+            if not (-90 <= user_lat <= 90) or not (-180 <= user_lng <= 180):
+                raise HTTPException(status_code=422, detail="Invalid coordinates")
 
         for store_id, data in store_products.items():
             store = data["store"]
@@ -145,9 +168,10 @@ async def chat_search(req: ChatSearchRequest):
 @router.get("/suggestions")
 async def get_suggestions(q: str, limit: int = 5):
     async with async_session() as session:
+        sanitized_q = sanitize_search_term(q)
         stmt = (
             select(Product.name)
-            .where(Product.name.ilike(f"%{q}%"))
+            .where(Product.name.ilike(f"%{sanitized_q}%"))
             .where(Product.stock > 0)
             .limit(limit * 3)
         )

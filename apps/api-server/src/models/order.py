@@ -1,4 +1,15 @@
-from sqlalchemy import Column, String, Float, Boolean, JSON, Integer, DECIMAL, Text, ForeignKey
+from sqlalchemy import (
+    Column,
+    String,
+    Float,
+    Boolean,
+    JSON,
+    Integer,
+    DECIMAL,
+    Text,
+    ForeignKey,
+    Index,
+)
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -49,6 +60,14 @@ class Order(Base):
     confirmed_at = Column(String)
     completed_at = Column(String)
     created_at = Column(String, default="now()")
+
+    __table_args__ = (
+        Index("idx_order_user_id", "user_id"),
+        Index("idx_order_store_id", "store_id"),
+        Index("idx_order_status", "status"),
+        Index("idx_order_number", "order_number"),
+        Index("idx_order_created_at", "created_at"),
+    )
 
 
 class OrderItem(Base):

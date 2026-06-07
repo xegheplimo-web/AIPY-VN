@@ -1,5 +1,17 @@
-from sqlalchemy import Column, String, Float, Boolean, JSON, Integer, DECIMAL, Text, ForeignKey, Table
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy import (
+    Column,
+    String,
+    Float,
+    Boolean,
+    JSON,
+    Integer,
+    DECIMAL,
+    Text,
+    ForeignKey,
+    Table,
+    Index,
+)
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
 
@@ -19,7 +31,7 @@ class Store(Base):
     zalo = Column(String(20))
     logo_url = Column(String(500))
     cover_image_url = Column(String(500))
-    images = Column(ARRAY(String))
+    images = Column(JSON)  # Changed from ARRAY(String) to JSON for SQLite compatibility
     business_hours = Column(JSON)
     is_open_now = Column(Boolean, default=True)
     rating = Column(DECIMAL(3, 2), default=0.00)
@@ -31,6 +43,13 @@ class Store(Base):
     updated_at = Column(String, default="now()")
 
     products = relationship("Product", back_populates="store")
+
+    __table_args__ = (
+        Index("idx_store_status", "status"),
+        Index("idx_store_location", "latitude", "longitude"),
+        Index("idx_store_industry", "industry"),
+        Index("idx_store_is_open", "is_open_now"),
+    )
 
 
 class Product(Base):
@@ -47,7 +66,7 @@ class Product(Base):
     dimensions = Column(JSON)
     barcode = Column(String(50))
     brand = Column(String(100))
-    images = Column(ARRAY(String))
+    images = Column(JSON)  # Changed from ARRAY(String) to JSON for SQLite compatibility
     shelf_location = Column(String(100))
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"))
     status = Column(String(20), default="active")
@@ -56,6 +75,14 @@ class Product(Base):
 
     store = relationship("Store", back_populates="products")
     category = relationship("Category", back_populates="products")
+
+    __table_args__ = (
+        Index("idx_product_store_id", "store_id"),
+        Index("idx_product_status", "status"),
+        Index("idx_product_name", "name"),
+        Index("idx_product_category", "category_id"),
+        Index("idx_product_stock", "stock"),
+    )
 
 
 class Category(Base):

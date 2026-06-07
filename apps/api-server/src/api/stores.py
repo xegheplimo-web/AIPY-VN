@@ -9,6 +9,8 @@ from sqlalchemy.orm import selectinload
 from src.db import async_session
 from src.models.store import Store, Product, Category
 from src.models.review import Review
+from src.utils.pagination import paginate, get_pagination_metadata
+from src.utils.uuid import safe_uuid
 
 router = APIRouter(prefix="/api/stores", tags=["Stores"])
 
@@ -137,9 +139,8 @@ async def list_stores(
             stmt = stmt.where(Store.is_open_now == is_open)
             count_stmt = count_stmt.where(Store.is_open_now == is_open)
 
-        # Pagination
-        offset = (page - 1) * limit
-        stmt = stmt.offset(offset).limit(limit)
+        # Pagination using utility
+        stmt = paginate(stmt, page=page, limit=limit)
 
         result = await session.execute(stmt)
         stores = result.scalars().all()
@@ -175,7 +176,8 @@ async def list_stores(
 async def get_store_detail(store_id: str):
     async with async_session() as session:
         # Get store
-        stmt = select(Store).where(Store.id == uuid.UUID(store_id))
+        store_uuid = safe_uuid(store_id)
+        stmt = select(Store).where(Store.id == store_uuid)
         result = await session.execute(stmt)
         store = result.scalar_one_or_none()
 
@@ -184,7 +186,7 @@ async def get_store_detail(store_id: str):
 
         # Count products
         products_count_stmt = select(func.count(Product.id)).where(
-            Product.store_id == uuid.UUID(store_id),
+            Product.store_id == store_uuid,
             Product.status == "active",
         )
         products_count_result = await session.execute(products_count_stmt)
@@ -192,7 +194,7 @@ async def get_store_detail(store_id: str):
 
         # Average rating from reviews
         avg_rating_stmt = select(func.avg(Review.rating)).where(
-            Review.store_id == uuid.UUID(store_id)
+            Review.store_id == store_uuid
         )
         avg_rating_result = await session.execute(avg_rating_stmt)
         average_rating = avg_rating_result.scalar_one()
@@ -229,28 +231,27 @@ async def get_store_products(
 ):
     async with async_session() as session:
         # Verify store exists
-        store_stmt = select(Store).where(Store.id == uuid.UUID(store_id))
+        store_uuid = safe_uuid(store_id)
+        store_stmt = select(Store).where(Store.id == store_uuid)
         store_result = await session.execute(store_stmt)
         store = store_result.scalar_one_or_none()
         if not store:
             raise HTTPException(status_code=404, detail="Store not found")
 
         # Get paginated products with category
-        offset = (page - 1) * limit
         stmt = (
             select(Product, Category.name.label("category_name"))
             .outerjoin(Category, Product.category_id == Category.id)
-            .where(Product.store_id == uuid.UUID(store_id))
+            .where(Product.store_id == store_uuid)
             .where(Product.status == "active")
-            .offset(offset)
-            .limit(limit)
         )
+        stmt = paginate(stmt, page=page, limit=limit)
         result = await session.execute(stmt)
         rows = result.all()
 
         # Count total
         count_stmt = select(func.count(Product.id)).where(
-            Product.store_id == uuid.UUID(store_id),
+            Product.store_id == store_uuid,
             Product.status == "active",
         )
         count_result = await session.execute(count_stmt)

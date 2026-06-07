@@ -4,10 +4,11 @@ from sqlalchemy import (
     Integer,
     Text,
     Boolean,
+    JSON,
     ForeignKey,
     CheckConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
 from src.db import Base
@@ -24,7 +25,7 @@ class Review(Base):
     rating = Column(Integer, nullable=False)
     title = Column(String(200))
     content = Column(Text)
-    images = Column(ARRAY(String))
+    images = Column(JSON)  # Changed from ARRAY(String) to JSON for SQLite compatibility
     is_verified_purchase = Column(Boolean, default=False)
     helpful_count = Column(Integer, default=0)
     created_at = Column(String, default="now()")

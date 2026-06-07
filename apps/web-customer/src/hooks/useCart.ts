@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '../services/api';
 
 export interface CartItem {
@@ -54,7 +54,13 @@ export function useCart() {
     } catch (err: any) {
       const local = getLocalCart();
       setItems(local);
-      setError(err.response?.data?.detail || 'Không thể tải giỏ hàng, dùng dữ liệu local');
+      if (err.response?.status === 401) {
+        setError('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
+      } else if (err.response?.status === 500) {
+        setError('Lỗi server, vui lòng thử lại sau');
+      } else {
+        setError(err.response?.data?.detail || 'Không thể tải giỏ hàng, dùng dữ liệu local');
+      }
     } finally {
       setLoading(false);
     }
@@ -81,20 +87,29 @@ export function useCart() {
           i.product_id === productId ? { ...i, quantity: i.quantity + quantity } : i
         );
       } else {
-        updated = [...local, {
-          id: `local-${Date.now()}`,
-          product_id: productId,
-          name: '',
-          price: 0,
-          quantity,
-          stock: 999,
-          store_id: '',
-          store_name: '',
-        }];
+        updated = [
+          ...local,
+          {
+            id: `local-${Date.now()}`,
+            product_id: productId,
+            name: '',
+            price: 0,
+            quantity,
+            stock: 999,
+            store_id: '',
+            store_name: '',
+          },
+        ];
       }
       setItems(updated);
       setLocalCart(updated);
-      setError(err.response?.data?.detail || 'Lỗi thêm vào giỏ hàng');
+      if (err.response?.status === 401) {
+        setError('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
+      } else if (err.response?.status === 400) {
+        setError('Sản phẩm không còn hàng hoặc số lượng không hợp lệ');
+      } else {
+        setError(err.response?.data?.detail || 'Lỗi thêm vào giỏ hàng');
+      }
       return false;
     }
   }, []);

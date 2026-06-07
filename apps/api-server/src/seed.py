@@ -1,13 +1,26 @@
+# -*- coding: utf-8 -*-
 import asyncio
 import uuid
+import sys
+import os
 from decimal import Decimal
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 
-from models.store import Store, Product, Category
-from models.user import User
+# Ensure UTF-8 encoding for stdout/stderr
+if sys.platform == "win32":
+    import codecs
+
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer, "strict")
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.buffer, "strict")
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.models.store import Store, Product, Category
+from src.models.user import User
 
 DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/vietstore"
 

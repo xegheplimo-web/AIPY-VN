@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Search, Mic, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 interface ChatSearchProps {
   onResultSelect?: (store: any) => void;
@@ -7,7 +7,7 @@ interface ChatSearchProps {
 
 export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
   const [messages, setMessages] = useState([
-    { role: 'bot', content: '👋 Chào bạn! Bạn cần tìm sản phẩm gì hoặc cửa hàng nào gần đây?' }
+    { role: 'bot', content: '👋 Chào bạn! Bạn cần tìm sản phẩm gì hoặc cửa hàng nào gần đây?' },
   ]);
   const [input, setInput] = useState('');
   const [location, setLocation] = useState(null);
@@ -30,11 +30,13 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
-    const phi1 = lat1 * Math.PI / 180;
-    const phi2 = lat2 * Math.PI / 180;
-    const deltaPhi = (lat2 - lat1) * Math.PI / 180;
-    const deltaLambda = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(deltaPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) ** 2;
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+    const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(deltaPhi / 2) ** 2 +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
@@ -42,7 +44,7 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
     if (!input.trim()) return;
 
     const userMsg = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
 
@@ -53,28 +55,36 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
         body: JSON.stringify({
           query: input,
           location,
-          radius_km: 5
-        })
+          radius_km: 5,
+        }),
       });
       const data = await res.json();
 
-      setMessages(prev => [...prev, {
-        role: 'bot',
-        content: data.summary,
-        stores: data.stores
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'bot',
+          content: data.summary,
+          stores: data.stores,
+        },
+      ]);
     } catch (err) {
-      setMessages(prev => [...prev, {
-        role: 'bot',
-        content: '❌ Rất tiếc, không tìm thấy kết quả. Bạn thử tìm với từ khóa khác nhé!'
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'bot',
+          content: '❌ Rất tiếc, không tìm thấy kết quả. Bạn thử tìm với từ khóa khác nhé!',
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const StoreCard = ({ store }: { store: any }) => {
-    const distance = location ? calculateDistance(location.lat, location.lng, store.latitude, store.longitude) : null;
+  const StoreCard = memo(({ store }: { store: any }) => {
+    const distance = location
+      ? calculateDistance(location.lat, location.lng, store.latitude, store.longitude)
+      : null;
 
     return (
       <div className="bg-white rounded-xl shadow p-4 mb-3 border border-gray-100">
@@ -84,11 +94,15 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
             <p className="text-sm text-gray-500">{store.address}</p>
           </div>
           {distance && (
-            <span className={`text-xs px-2 py-1 rounded-full ${
-              distance < 500 ? 'bg-green-100 text-green-700' :
-              distance < 2000 ? 'bg-yellow-100 text-yellow-700' :
-              'bg-gray-100 text-gray-600'
-            }`}>
+            <span
+              className={`text-xs px-2 py-1 rounded-full ${
+                distance < 500
+                  ? 'bg-green-100 text-green-700'
+                  : distance < 2000
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-gray-100 text-gray-600'
+              }`}
+            >
               {(distance / 1000).toFixed(1)}km
             </span>
           )}
@@ -102,7 +116,9 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
                 <p className="text-xs text-gray-500">📍 {p.shelf_location}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-blue-600">{p.price?.toLocaleString('vi-VN')}đ</p>
+                <p className="text-sm font-bold text-blue-600">
+                  {p.price?.toLocaleString('vi-VN')}đ
+                </p>
                 <p className={`text-xs ${p.in_stock ? 'text-green-600' : 'text-red-500'}`}>
                   {p.in_stock ? `Còn ${p.stock}` : 'Hết hàng'}
                 </p>
@@ -115,30 +131,37 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
           <button
             onClick={() => window.open(store.map_url, '_blank')}
             className="flex-1 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            aria-label="Chỉ đường đến cửa hàng"
           >
             📍 Chỉ đường
           </button>
           <button
             onClick={() => onResultSelect?.(store)}
             className="flex-1 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+            aria-label="Xem chi tiết cửa hàng"
           >
             ℹ️ Xem chi tiết
           </button>
         </div>
       </div>
     );
-  };
+  });
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg: any, idx: number) => (
-          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-              msg.role === 'user'
-                ? 'bg-blue-600 text-white rounded-br-none'
-                : 'bg-white shadow border border-gray-100 rounded-bl-none'
-            }`}>
+          <div
+            key={idx}
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                msg.role === 'user'
+                  ? 'bg-blue-600 text-white rounded-br-none'
+                  : 'bg-white shadow border border-gray-100 rounded-bl-none'
+              }`}
+            >
               <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
               {msg.stores?.map((store: any) => (
                 <StoreCard key={store.id} store={store} />
@@ -162,9 +185,15 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
 
       <div className="p-4 bg-white border-t">
         <div className="flex gap-2">
-          <button className="p-3 text-gray-500 hover:text-blue-600">
-            <Mic className="w-5 h-5" />
-          </button>
+          <VoiceSearch
+            onTranscript={(text) => {
+              setInput(text);
+              handleSend();
+            }}
+            onError={(error) => {
+              setMessages((prev) => [...prev, { role: 'bot', content: `❌ ${error}` }]);
+            }}
+          />
           <input
             type="text"
             value={input}
@@ -172,11 +201,14 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Tìm sản phẩm, cửa hàng..."
             className="flex-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Tìm kiếm sản phẩm hoặc cửa hàng"
           />
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
             className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50"
+            aria-label="Gửi tin nhắn tìm kiếm"
+            aria-busy={loading}
           >
             <Send className="w-5 h-5" />
           </button>

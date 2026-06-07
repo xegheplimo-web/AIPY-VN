@@ -6,11 +6,11 @@ from starlette.responses import JSONResponse
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Simple in-memory rate limiter.
-    
+
     TODO: Replace with Redis-backed rate limiter for production multi-instance.
     """
 
-    def __init__(self, app, max_requests: int = 100, window: int = 60):
+    def __init__(self, app, max_requests: int = 200, window: int = 60):
         super().__init__(app)
         self.max_requests = max_requests
         self.window = window
@@ -27,7 +27,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Clean old entries
         if client_ip in self._requests:
             self._requests[client_ip] = [
-                (ts, cnt) for ts, cnt in self._requests[client_ip]
+                (ts, cnt)
+                for ts, cnt in self._requests[client_ip]
                 if now - ts < self.window
             ]
         else:

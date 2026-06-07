@@ -3,17 +3,22 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle Pydantic validation errors."""
     errors = []
     for error in exc.errors():
-        errors.append({
-            "field": ".".join(str(x) for x in error["loc"]),
-            "message": error["msg"],
-            "type": error["type"],
-        })
+        errors.append(
+            {
+                "field": ".".join(str(x) for x in error["loc"]),
+                "message": error["msg"],
+                "type": error["type"],
+            }
+        )
     return JSONResponse(
         status_code=422,
         content={
@@ -26,12 +31,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
     """Handle database errors without exposing internal details."""
-    print(f"Database error: {exc}")
+    request_id = getattr(request.state, "request_id", None)
+    logger.error(f"Database error [{request_id}]: {str(exc)}")
     return JSONResponse(
         status_code=500,
         content={
             "error": "Database Error",
-            "request_id": getattr(request.state, "request_id", None),
+            "request_id": request_id,
             "message": "An error occurred while accessing the database. Please try again.",
         },
     )
@@ -40,8 +46,8 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
 async def generic_exception_handler(request: Request, exc: Exception):
     """Handle all unhandled exceptions."""
     request_id = getattr(request.state, "request_id", None)
-    print(f"Unhandled exception [{request_id}]: {exc}")
-    traceback.print_exc()
+    logger.error(f"Unhandled exception [{request_id}]: {exc}")
+    logger.error(traceback.format_exc())
     return JSONResponse(
         status_code=500,
         content={

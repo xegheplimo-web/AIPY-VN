@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.orm import selectinload
 
 from src.db import async_session
@@ -173,9 +173,17 @@ async def add_to_cart(data: AddCartItemRequest, user_id: Optional[str] = None):
         existing = existing_result.scalar_one_or_none()
 
         if existing:
-            existing.quantity += data.quantity
-            existing.unit_price = product.price
+            # Use atomic update with row-level lock to prevent race conditions
+            await session.execute(
+                update(CartItem)
+                .where(CartItem.id == existing.id)
+                .values(
+                    quantity=CartItem.quantity + data.quantity, unit_price=product.price
+                )
+                .with_for_update()  # Row-level lock
+            )
             await session.commit()
+            await session.refresh(existing)
             return AddCartItemResponse(
                 item_id=str(existing.id),
                 status="updated",
