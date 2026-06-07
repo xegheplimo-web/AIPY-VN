@@ -31,7 +31,7 @@ async def search_stores(
         - Thế Giới Di Động
         - Pharmacity
     """
-    stores = locator.search_chain_stores(brand=q, city=city)
+    stores = await locator.search_stores_by_name(query=q, city=city, limit=limit)
     return {
         "total": len(stores),
         "query": q,
@@ -77,7 +77,8 @@ async def find_nearby(
         - fast_food: Fast food
     """
     results = locator.find_nearest_stores(
-        lat=lat, lon=lng,
+        lat=lat,
+        lon=lng,
         category=category,
         radius_km=radius,
         limit=limit,
@@ -98,9 +99,11 @@ async def geocode(
     """
     Chuyển địa chỉ → tọa độ.
 
+    Priority: OpenMap.vn → Nominatim
+
     Ví dụ: "123 Nguyễn Huệ, Quận 1, TP.HCM"
     """
-    result = locator.geocode_address(address)
+    result = await locator.geocode_address(address)
     if not result:
         raise HTTPException(status_code=404, detail="Không tìm thấy địa chỉ")
     return result
@@ -114,9 +117,11 @@ async def reverse_geocode(
     """
     Chuyển tọa độ → địa chỉ đầy đủ.
 
+    Priority: OpenMap.vn → Nominatim
+
     Ví dụ: (10.7769, 106.7009) → "123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM"
     """
-    return locator.reverse_geocode(lat, lng)
+    return await locator.reverse_geocode(lat, lng)
 
 
 @router.get("/category/{category}")

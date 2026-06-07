@@ -139,6 +139,20 @@ class SerpAPIConfig(BaseModel):
         return bool(self.api_key)
 
 
+class OpenMapConfig(BaseModel):
+    """OpenMap.vn configuration for Vietnam-specific location data."""
+
+    api_key: str = Field(default="", alias="OPENMAP_API_KEY")
+    base_url: str = Field(
+        default="https://api.openmap.vn/place", alias="OPENMAP_BASE_URL"
+    )
+    timeout: int = Field(default=10, alias="OPENMAP_TIMEOUT")
+
+    def is_configured(self) -> bool:
+        """Check if OpenMap is properly configured."""
+        return bool(self.api_key)
+
+
 class AppConfig(BaseSettings):
     """Application configuration."""
 
@@ -172,6 +186,9 @@ class AppConfig(BaseSettings):
 
     # SerpAPI
     serpapi: SerpAPIConfig = Field(default_factory=SerpAPIConfig)
+
+    # OpenMap
+    openmap: OpenMapConfig = Field(default_factory=OpenMapConfig)
 
     # JWT
     jwt_access_expire_minutes: int = Field(

@@ -12,6 +12,7 @@ $env:RATE_LIMIT_WINDOW_SECONDS = "60"
 $env:LOG_LEVEL = "info"
 $env:SERPAPI_KEY = "d3427bacea59fab22364b9586ea3753b99918e695fd138930b655d67d6054b42"
 $env:SERPAPI_ENGINE = "google"
+$env:OPENMAP_API_KEY = "OPoYD3ftQj5blwOqFULlb4h8rZsCcrvX"
 
 # Chạy lệnh được truyền vào
 $command = $args[0]

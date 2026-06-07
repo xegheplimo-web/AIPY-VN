@@ -1,7 +1,7 @@
 """
 Vietnam Store Locator Service
 
-Lấy tọa độ & địa chỉ cửa hàng tại VN sử dụng OpenStreetMap (MIỄN PHÍ, không cần API key)
+Lấy tọa độ & địa chỉ cửa hàng tại VN sử dụng OpenMap.vn (ưu tiên) và OpenStreetMap (fallback)
 """
 
 import logging
@@ -11,12 +11,15 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, asdict
 import requests
 
+from src.config import config
+
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Store:
     """Store data model."""
+
     name: str
     latitude: float
     longitude: float
@@ -46,15 +49,81 @@ class VietnamStoreLocator:
     def __init__(self):
         """Initialize store locator."""
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "AIPY-VN-StoreLocator/1.0 (contact@example.com)"
-        })
+        self.session.headers.update(
+            {"User-Agent": "AIPY-VN-StoreLocator/1.0 (contact@example.com)"}
+        )
 
-    def search_stores_by_name(
-        self,
-        query: str,
-        city: str = "Hồ Chí Minh",
-        limit: int = 50
+        # Try to import OpenMap service
+        try:
+            from src.services.openmap import get_openmap_service
+
+            self.openmap = get_openmap_service()
+            self.use_openmap = self.openmap.is_ready()
+            if self.use_openmap:
+                logger.info("OpenMap.vn service enabled (priority)")
+        except Exception as e:
+            logger.warning(f"OpenMap service not available: {e}")
+            self.openmap = None
+            self.use_openmap = False
+
+    async def _try_openmap_nearby(
+        self, lat: float, lon: float, category: str, radius_km: float
+    ) -> List[Store]:
+        """Try OpenMap.vn first (priority for Vietnam data)."""
+        if not self.use_openmap:
+            return []
+
+        try:
+            # Map category to OpenMap types
+            type_map = {
+                "supermarket": "supermarket",
+                "convenience": "convenience_store",
+                "cafe": "cafe",
+                "restaurant": "restaurant",
+                "pharmacy": "pharmacy",
+                "bank": "bank",
+                "fuel": "gas_station",
+                "bakery": "bakery",
+                "fast_food": "fast_food",
+            }
+
+            openmap_type = type_map.get(category, category)
+            results = await self.openmap.place_nearby(
+                lat=lat,
+                lon=lon,
+                radius=int(radius_km * 1000),
+                types=openmap_type,
+                limit=50,
+            )
+
+            # Convert OpenMap results to Store objects
+            stores = []
+            for r in results:
+                stores.append(
+                    Store(
+                        name=r.get("name", "Không tên"),
+                        latitude=r.get("lat", 0),
+                        longitude=r.get("lon", 0),
+                        address=r.get("address", ""),
+                        city=r.get("city", ""),
+                        district=r.get("district", ""),
+                        ward=r.get("ward", ""),
+                        phone=r.get("phone"),
+                        category=category,
+                        opening_hours=r.get("opening_hours"),
+                        website=r.get("website"),
+                    )
+                )
+
+            logger.info(f"OpenMap found {len(stores)} {category} stores")
+            return stores
+
+        except Exception as e:
+            logger.error(f"OpenMap nearby search failed: {e}")
+            return []
+
+    async def search_stores_by_name(
+        self, query: str, city: str = "Hồ Chí Minh", limit: int = 50
     ) -> List[Store]:
         """
         Tìm cửa hàng theo tên.
@@ -64,6 +133,37 @@ class VietnamStoreLocator:
             search_stores_by_name("Circle K", city="Hà Nội")
             search_stores_by_name("Highland Coffee")
         """
+        # Try OpenMap first if available
+        if self.use_openmap:
+            try:
+                results = await self.openmap.search_text(
+                    query, lat=None, lon=None, limit=limit
+                )
+                if results:
+                    # Convert to Store objects
+                    stores = []
+                    for r in results:
+                        stores.append(
+                            Store(
+                                name=r.get("name", query),
+                                latitude=r.get("lat", 0),
+                                longitude=r.get("lon", 0),
+                                address=r.get("address", ""),
+                                city=r.get("city", city),
+                                district=r.get("district", ""),
+                                ward=r.get("ward", ""),
+                                phone=r.get("phone"),
+                                category=r.get("type", ""),
+                                opening_hours=r.get("opening_hours"),
+                                website=r.get("website"),
+                            )
+                        )
+                    logger.info(f"OpenMap found {len(stores)} stores for {query}")
+                    return stores
+            except Exception as e:
+                logger.error(f"OpenMap search failed: {e}")
+
+        # Fallback to Nominatim
         params = {
             "q": f"{query}, {city}, Vietnam",
             "format": "json",
@@ -74,9 +174,7 @@ class VietnamStoreLocator:
         }
 
         try:
-            response = self.session.get(
-                f"{self.NOMINATIM_URL}/search", params=params
-            )
+            response = self.session.get(f"{self.NOMINATIM_URL}/search", params=params)
             response.raise_for_status()
             results = response.json()
 
@@ -158,10 +256,7 @@ class VietnamStoreLocator:
             "mobile_phone": 'node["shop"="mobile_phone"]',
         }
 
-        osm_tag = tag_map.get(
-            category,
-            f'node["shop"="{category}"]'
-        )
+        osm_tag = tag_map.get(category, f'node["shop"="{category}"]')
 
         # Overpass QL query
         query = f"""
@@ -176,10 +271,7 @@ class VietnamStoreLocator:
         """
 
         try:
-            response = self.session.post(
-                self.OVERPASS_URL,
-                data={"data": query}
-            )
+            response = self.session.post(self.OVERPASS_URL, data={"data": query})
             response.raise_for_status()
             data = response.json()
 
@@ -260,10 +352,7 @@ class VietnamStoreLocator:
         """
 
         try:
-            response = self.session.post(
-                self.OVERPASS_URL,
-                data={"data": query}
-            )
+            response = self.session.post(self.OVERPASS_URL, data={"data": query})
             response.raise_for_status()
             data = response.json()
 
@@ -303,13 +392,35 @@ class VietnamStoreLocator:
             logger.error(f"Error searching chain stores: {e}")
             return []
 
-    def reverse_geocode(self, lat: float, lon: float) -> Dict[str, Any]:
+    async def reverse_geocode(self, lat: float, lon: float) -> Dict[str, Any]:
         """
         Chuyển tọa độ thành địa chỉ đầy đủ.
+
+        Priority: OpenMap.vn → Nominatim
 
         Ví dụ: reverse_geocode(10.7769, 106.7009)
         → "123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM"
         """
+        # Try OpenMap first
+        if self.use_openmap:
+            try:
+                result = await self.openmap.reverse_geocode(lat, lon)
+                if result:
+                    return {
+                        "full_address": result.get("address", ""),
+                        "house_number": result.get("house_number", ""),
+                        "road": result.get("road", ""),
+                        "ward": result.get("ward", ""),
+                        "district": result.get("district", ""),
+                        "city": result.get("city", ""),
+                        "state": result.get("state", ""),
+                        "postcode": result.get("postcode", ""),
+                        "country": result.get("country", "Việt Nam"),
+                    }
+            except Exception as e:
+                logger.error(f"OpenMap reverse geocode failed: {e}")
+
+        # Fallback to Nominatim
         params = {
             "lat": lat,
             "lon": lon,
@@ -320,9 +431,7 @@ class VietnamStoreLocator:
         }
 
         try:
-            response = self.session.get(
-                f"{self.NOMINATIM_URL}/reverse", params=params
-            )
+            response = self.session.get(f"{self.NOMINATIM_URL}/reverse", params=params)
             response.raise_for_status()
             data = response.json()
             addr = data.get("address", {})
@@ -343,13 +452,33 @@ class VietnamStoreLocator:
             logger.error(f"Error reverse geocoding: {e}")
             return {}
 
-    def geocode_address(self, address: str) -> Optional[Dict[str, Any]]:
+    async def geocode_address(self, address: str) -> Optional[Dict[str, Any]]:
         """
         Chuyển địa chỉ thành tọa độ.
+
+        Priority: OpenMap.vn → Nominatim
 
         Ví dụ: geocode_address("123 Nguyễn Huệ, Quận 1, TP.HCM")
         → {"lat": 10.7769, "lon": 106.7009}
         """
+        # Try OpenMap first
+        if self.use_openmap:
+            try:
+                result = await self.openmap.geocode(address)
+                if result:
+                    return {
+                        "latitude": result.get("lat", 0),
+                        "longitude": result.get("lon", 0),
+                        "full_address": result.get("address", ""),
+                        "ward": result.get("ward", ""),
+                        "district": result.get("district", ""),
+                        "city": result.get("city", ""),
+                        "confidence": 1.0,
+                    }
+            except Exception as e:
+                logger.error(f"OpenMap geocode failed: {e}")
+
+        # Fallback to Nominatim
         params = {
             "q": f"{address}, Vietnam",
             "format": "json",
@@ -360,9 +489,7 @@ class VietnamStoreLocator:
         }
 
         try:
-            response = self.session.get(
-                f"{self.NOMINATIM_URL}/search", params=params
-            )
+            response = self.session.get(f"{self.NOMINATIM_URL}/search", params=params)
             response.raise_for_status()
             results = response.json()
 
@@ -386,7 +513,7 @@ class VietnamStoreLocator:
             logger.error(f"Error geocoding address: {e}")
             return None
 
-    def find_nearest_stores(
+    async def find_nearest_stores(
         self,
         lat: float,
         lon: float,
@@ -396,28 +523,36 @@ class VietnamStoreLocator:
     ) -> List[Dict[str, Any]]:
         """
         Tìm cửa hàng gần nhất từ vị trí hiện tại.
+
+        Priority: OpenMap.vn → Overpass API
         """
-        stores = self._search_nearby(lat, lon, category, radius_km)
+        # Try OpenMap first (Vietnam-optimized)
+        stores = []
+        if self.use_openmap:
+            stores = await self._try_openmap_nearby(lat, lon, category, radius_km)
+
+        # Fallback to Overpass if OpenMap returns no results
+        if not stores:
+            stores = self._search_nearby(lat, lon, category, radius_km)
 
         # Tính khoảng cách
         results = []
         for store in stores:
-            distance = self._haversine(
-                lat, lon, store.latitude, store.longitude
+            distance = self._haversine(lat, lon, store.latitude, store.longitude)
+            results.append(
+                {
+                    **asdict(store),
+                    "distance_km": round(distance, 2),
+                    "distance_text": self._format_distance(distance),
+                }
             )
-            results.append({
-                **asdict(store),
-                "distance_km": round(distance, 2),
-                "distance_text": self._format_distance(distance),
-            })
 
         # Sắp xếp theo khoảng cách
         results.sort(key=lambda x: x["distance_km"])
         return results[:limit]
 
     def _search_nearby(
-        self, lat: float, lon: float,
-        category: str, radius_km: float
+        self, lat: float, lon: float, category: str, radius_km: float
     ) -> List[Store]:
         """Tìm trực tiếp bằng tọa độ."""
         radius_m = radius_km * 1000
@@ -441,29 +576,28 @@ class VietnamStoreLocator:
         """
 
         try:
-            response = self.session.post(
-                self.OVERPASS_URL,
-                data={"data": query}
-            )
+            response = self.session.post(self.OVERPASS_URL, data={"data": query})
             response.raise_for_status()
             data = response.json()
 
             stores = []
             for el in data.get("elements", []):
                 tags = el.get("tags", {})
-                stores.append(Store(
-                    name=tags.get("name", "Không tên"),
-                    latitude=el["lat"],
-                    longitude=el["lon"],
-                    address=self._build_address(tags),
-                    city=tags.get("addr:city", ""),
-                    district=tags.get("addr:district", ""),
-                    ward=tags.get("addr:ward", ""),
-                    phone=tags.get("phone"),
-                    category=category,
-                    opening_hours=tags.get("opening_hours"),
-                    osm_id=el.get("id"),
-                ))
+                stores.append(
+                    Store(
+                        name=tags.get("name", "Không tên"),
+                        latitude=el["lat"],
+                        longitude=el["lon"],
+                        address=self._build_address(tags),
+                        city=tags.get("addr:city", ""),
+                        district=tags.get("addr:district", ""),
+                        ward=tags.get("addr:ward", ""),
+                        phone=tags.get("phone"),
+                        category=category,
+                        opening_hours=tags.get("opening_hours"),
+                        osm_id=el.get("id"),
+                    )
+                )
 
             return stores
 
@@ -504,9 +638,7 @@ class VietnamStoreLocator:
             "countrycodes": "vn",
         }
         try:
-            response = self.session.get(
-                f"{self.NOMINATIM_URL}/search", params=params
-            )
+            response = self.session.get(f"{self.NOMINATIM_URL}/search", params=params)
             results = response.json()
 
             if results:
@@ -521,8 +653,11 @@ class VietnamStoreLocator:
         """Xây dựng địa chỉ từ OSM tags."""
         parts = []
         for key in [
-            "addr:housenumber", "addr:street",
-            "addr:ward", "addr:district", "addr:city"
+            "addr:housenumber",
+            "addr:street",
+            "addr:ward",
+            "addr:district",
+            "addr:city",
         ]:
             if tags.get(key):
                 parts.append(tags[key])
@@ -530,10 +665,7 @@ class VietnamStoreLocator:
         return ", ".join(parts) if parts else tags.get("address", "")
 
     @staticmethod
-    def _haversine(
-        lat1: float, lon1: float,
-        lat2: float, lon2: float
-    ) -> float:
+    def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """Tính khoảng cách giữa 2 điểm (km)."""
         R = 6371  # km
 
