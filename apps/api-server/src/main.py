@@ -26,6 +26,7 @@ from src.api.reviews import router as reviews
 from src.api.profile import router as profile
 from src.api.categories import router as categories
 from src.api.favorites import router as favorites
+from src.api.store_locator import router as store_locator
 
 # from src.db import init_db  # Using Alembic migrations instead
 from src.middleware import (
@@ -196,6 +197,7 @@ app.include_router(reviews, prefix=api_v1_prefix)
 app.include_router(profile, prefix=api_v1_prefix)
 app.include_router(categories, prefix=api_v1_prefix)
 app.include_router(favorites, prefix=api_v1_prefix)
+app.include_router(store_locator, prefix=api_v1_prefix)
 
 # Legacy routes (backward compatibility - no prefix)
 app.include_router(search)
@@ -216,6 +218,7 @@ app.include_router(reviews)
 app.include_router(profile)
 app.include_router(categories)
 app.include_router(favorites)
+app.include_router(store_locator)
 
 
 @app.get("/health")

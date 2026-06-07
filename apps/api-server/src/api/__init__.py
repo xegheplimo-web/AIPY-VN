@@ -15,6 +15,7 @@ from .reviews import router as reviews
 from .profile import router as profile
 from .categories import router as categories
 from .favorites import router as favorites
+from .store_locator import router as store_locator
 
 __all__ = [
     "search",
@@ -34,4 +35,5 @@ __all__ = [
     "profile",
     "categories",
     "favorites",
+    "store_locator",
 ]
