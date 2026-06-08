@@ -31,6 +31,9 @@ from src.api.geo import router as geo
 from src.api.profile import router as profile
 from src.api.reviews import router as reviews
 from src.api.store_locator import router as store_locator
+from src.api.notifications_api import router as notifications_api
+from src.api.advanced_search_api import router as advanced_search_api
+from src.api.payment_gateway_api import router as payment_gateway_api
 from src.config import config, validate_config
 
 # from src.database import init_db  # Using Alembic migrations instead
@@ -237,6 +240,15 @@ from src.services.key_rotation import rotation_router
 
 app.include_router(rotation_router, prefix=api_v1_prefix)
 
+# Add notifications API router
+app.include_router(notifications_api, prefix=api_v1_prefix)
+
+# Add advanced search API router
+app.include_router(advanced_search_api, prefix=api_v1_prefix)
+
+# Add payment gateway API router
+app.include_router(payment_gateway_api, prefix=api_v1_prefix)
+
 # WebSocket routes
 app.include_router(websocket)
 
@@ -326,3 +338,11 @@ async def health_check():
         health_status["services"]["vector_db"] = "disabled"
 
     return health_status
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    from src.services.prometheus_metrics import get_metrics
+
+    return get_metrics()

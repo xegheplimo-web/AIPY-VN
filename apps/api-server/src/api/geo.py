@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.services.geo_cache import GeoCacheService, get_geo_cache
 from src.services.geo_search import GeoSearchService
+from src.services.geo_service import GeoService, get_geo_service as get_smart_geo
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,11 @@ async def get_geo_service(session: AsyncSession = Depends(get_db)) -> GeoSearchS
     """Dependency injection for GeoSearchService."""
     cache = get_geo_cache()
     return GeoSearchService(session, cache=cache)
+
+
+async def get_smart_geo_service() -> GeoService:
+    """Dependency injection for GeoService (external API + L1/L2 cache)."""
+    return get_smart_geo()
 
 
 @router.get("/search")
@@ -163,9 +169,64 @@ async def autocomplete(
 
 
 @router.get("/cache/stats")
-async def cache_stats(cache: GeoCacheService = Depends(get_geo_cache)):
-    """📊 Thống kê cache."""
-    return await cache.get_stats()
+async def cache_stats(
+    cache: GeoCacheService = Depends(get_geo_cache),
+    smart_geo: GeoService = Depends(get_smart_geo_service),
+):
+    """📊 Thống kê cache (Redis L1 + SQLite L2)."""
+    redis_stats = await cache.get_stats()
+    memory_stats = smart_geo.get_stats()
+    return {
+        "redis_l1": redis_stats,
+        "sqlite_l2": memory_stats,
+    }
+
+
+@router.get("/geocode/external")
+async def geocode_external(
+    address: str = Query(..., description="Địa chỉ cần geocode"),
+    api: str = Query("nominatim", description="API provider: nominatim|google|goong"),
+    force_refresh: bool = Query(False, description="Bỏ qua cache"),
+    svc: GeoService = Depends(get_smart_geo_service),
+):
+    """
+    🌍 Địa chỉ → Tọa độ (external API + auto cache).
+
+    Tự động kiểm tra Redis → SQLite → API.
+    Kết quả API tự động lưu vào cả 2 tầng cache.
+    """
+    result = await svc.geocode(address, api=api, force_refresh=force_refresh)
+    if not result:
+        raise HTTPException(status_code=404, detail="Không tìm thấy địa chỉ")
+    return result
+
+
+@router.get("/reverse/external")
+async def reverse_geocode_external(
+    lat: float = Query(..., description="Latitude"),
+    lng: float = Query(..., description="Longitude"),
+    api: str = Query("nominatim", description="API provider"),
+    svc: GeoService = Depends(get_smart_geo_service),
+):
+    """🌍 Tọa độ → Địa chỉ (external API + auto cache)."""
+    result = await svc.reverse_geocode(lat, lng, api=api)
+    if not result:
+        raise HTTPException(status_code=404, detail="Không tìm thấy địa chỉ")
+    return result
+
+
+@router.post("/batch/geocode")
+async def batch_geocode(
+    addresses: list[str],
+    api: str = Query("nominatim", description="API provider"),
+    svc: GeoService = Depends(get_smart_geo_service),
+):
+    """
+    🌍 Geocode nhiều địa chỉ cùng lúc.
+
+    Chỉ gọi API cho địa chỉ chưa có trong cache.
+    """
+    return await svc.batch_geocode(addresses, api=api)
 
 
 @router.post("/cache/invalidate")
