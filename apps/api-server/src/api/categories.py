@@ -6,13 +6,14 @@ Endpoints for managing product categories.
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 from src.database import async_session
 from src.middleware.auth_middleware import require_admin
 from src.models.store import Category
 from src.models.user import User
+from src.utils.pagination import paginate, get_pagination_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +42,28 @@ class CategoryResponse(BaseModel):
     created_at: str
     updated_at: str | None
     model_config = {"from_attributes": True}
-@router.get("", response_model=list[CategoryResponse])
+
+
+class CategoryListResponse(BaseModel):
+    """Response model for category list with pagination."""
+
+    categories: list[CategoryResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
+@router.get("", response_model=CategoryListResponse)
 async def get_categories(
-    skip: int = 0,
-    limit: int = 50,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
     active_only: bool = True,
 ):
     """
-    Get all categories.
+    Get all categories with pagination.
 
     - Returns paginated list of categories
     - Can filter by active status
@@ -59,23 +74,41 @@ async def get_categories(
         if active_only:
             query = query.where(Category.is_active)
 
-        query = query.order_by(Category.name).offset(skip).limit(limit)
+        # Count total
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await session.execute(count_query)
+        total = total_result.scalar_one()
+
+        # Apply pagination
+        query = query.order_by(Category.name)
+        query = paginate(query, page=page, limit=limit)
         result = await session.execute(query)
         categories = result.scalars().all()
 
-        return [
-            CategoryResponse(
-                id=str(cat.id),
-                name=cat.name,
-                slug=cat.slug,
-                description=cat.description,
-                icon=cat.icon,
-                is_active=cat.is_active,
-                created_at=cat.created_at,
-                updated_at=cat.updated_at,
-            )
-            for cat in categories
-        ]
+        # Get pagination metadata
+        metadata = get_pagination_metadata(total, page, limit)
+
+        return CategoryListResponse(
+            categories=[
+                CategoryResponse(
+                    id=str(cat.id),
+                    name=cat.name,
+                    slug=cat.slug,
+                    description=cat.description,
+                    icon=cat.icon,
+                    is_active=cat.is_active,
+                    created_at=cat.created_at,
+                    updated_at=cat.updated_at,
+                )
+                for cat in categories
+            ],
+            total=total,
+            page=page,
+            limit=limit,
+            total_pages=metadata["total_pages"],
+            has_next=metadata["has_next"],
+            has_prev=metadata["has_prev"],
+        )
 
 
 @router.get("/{category_id}", response_model=CategoryResponse)
