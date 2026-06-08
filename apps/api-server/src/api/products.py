@@ -135,3 +135,97 @@ async def get_alternatives(product_id: str, limit: int = 10):
         ]
 
         return AlternativesResponse(alternatives=alternatives)
+
+
+class ProductOfferItem(BaseModel):
+    store_id: str
+    store_name: str
+    distance_m: float | None = None
+    price: float | None = None
+    stock: int | None = None
+    is_open_now: bool | None = None
+    map_url: str
+
+
+class ProductOffersResponse(BaseModel):
+    offers: list[ProductOfferItem]
+
+
+@router.get("/{product_id}/offers", response_model=ProductOffersResponse)
+async def get_product_offers(
+    product_id: str,
+    lat: float | None = None,
+    lng: float | None = None,
+):
+    """Get all stores selling the same or similar product near the user."""
+    async with async_session() as session:
+        # Load the original product
+        stmt = select(Product).where(Product.id == uuid.UUID(product_id))
+        result = await session.execute(stmt)
+        original = result.scalar_one_or_none()
+
+        if not original:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        # Find products with similar name or same category in other stores
+        similarity_stmt = (
+            select(Product, Store)
+            .join(Store, Product.store_id == Store.id)
+            .where(Product.id != uuid.UUID(product_id))
+            .where(Product.status == "active")
+            .where(Product.stock > 0)
+        )
+
+        # Prefer same-name match, fallback to same category
+        if original.name:
+            similarity_stmt = similarity_stmt.where(
+                Product.name.ilike(f"%{original.name}%")
+            )
+        elif original.category_id:
+            similarity_stmt = similarity_stmt.where(
+                Product.category_id == original.category_id
+            )
+        else:
+            return ProductOffersResponse(offers=[])
+
+        similarity_stmt = similarity_stmt.limit(20)
+        result = await session.execute(similarity_stmt)
+        rows = result.all()
+
+        offers = []
+        for p, store in rows:
+            # Calculate distance if coordinates provided
+            distance_m = None
+            if (
+                lat is not None
+                and lng is not None
+                and store.latitude
+                and store.longitude
+            ):
+                from math import radians, sin, cos, sqrt, atan2
+
+                R = 6371000  # Earth radius in meters
+                lat1, lon1 = radians(lat), radians(lng)
+                lat2, lon2 = radians(store.latitude), radians(store.longitude)
+                dlat = lat2 - lat1
+                dlon = lon2 - lon1
+                a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+                c = 2 * atan2(sqrt(a), sqrt(1 - a))
+                distance_m = round(R * c, 0)
+
+            offers.append(
+                ProductOfferItem(
+                    store_id=str(store.id),
+                    store_name=store.name,
+                    distance_m=distance_m,
+                    price=float(p.price) if p.price else None,
+                    stock=p.stock,
+                    is_open_now=store.is_open_now,
+                    map_url=f"https://www.google.com/maps/dir/?api=1&destination={store.latitude},{store.longitude}&q={store.name}",
+                )
+            )
+
+        # Sort by distance if available
+        offers.sort(key=lambda o: (o.distance_m is None, o.distance_m or 0))
+
+        return ProductOffersResponse(offers=offers)

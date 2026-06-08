@@ -14,7 +14,6 @@ const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'));
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'));
 const StoreDetailPage = lazy(() => import('./pages/StoreDetailPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
-const DemoPage = lazy(() => import('./pages/DemoPage'));
 const StoreChatPage = lazy(() => import('./pages/StoreChatPage'));
 const StoreLocatorPage = lazy(() => import('./pages/StoreLocatorPage'));
 
@@ -43,7 +42,6 @@ export default function App() {
                   <Route path="product/:id" element={<ProductDetailPage />} />
                   <Route path="orders" element={<OrderTrackingPage />} />
                   <Route path="profile" element={<UserProfilePage />} />
-                  <Route path="demo" element={<DemoPage />} />
                   <Route path="chat" element={<StoreChatPage />} />
                   <Route path="locator" element={<StoreLocatorPage />} />
                 </Route>

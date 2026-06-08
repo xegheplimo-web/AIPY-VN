@@ -17,21 +17,20 @@ export default function AdminLoginPage() {
     setError('');
 
     try {
-      const res = await api.post('/api/auth/login', {
-        email,
-        password,
-      });
+      const res: any = await api.login(email, password);
+      const user = res.user || res.data?.user;
+      const token = res.access_token || res.data?.access_token;
 
       // Verify admin role
-      if (res.data.user.role !== 'admin') {
-        throw new Error('Access denied: Admin role required');
+      if (user?.role !== 'admin') {
+        throw new Error('Truy cập bị từ chối: cần quyền Admin');
       }
 
-      localStorage.setItem('token', res.data.access_token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      if (token) localStorage.setItem('token', token);
+      if (user) localStorage.setItem('user', JSON.stringify(user));
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Login failed');
+      setError(err.message || 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }
@@ -46,7 +45,7 @@ export default function AdminLoginPage() {
           </div>
         </div>
         <h1 className="text-2xl font-bold text-center mb-2">Admin Dashboard</h1>
-        <p className="text-gray-500 text-center mb-6">Dang nhap quan tri he thong</p>
+        <p className="text-gray-500 text-center mb-6">Đăng nhập quản trị hệ thống</p>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
@@ -62,12 +61,12 @@ export default function AdminLoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="admin@vietstore.vn"
+              placeholder="admin@aipy.vn"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Mat khau</label>
+            <label className="block text-sm font-medium mb-1">Mật khẩu</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -91,7 +90,7 @@ export default function AdminLoginPage() {
             disabled={loading}
             className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? 'Dang xu ly...' : 'Dang nhap'}
+            {loading ? 'Đang xử lý...' : 'Đăng nhập'}
           </button>
         </form>
       </div>

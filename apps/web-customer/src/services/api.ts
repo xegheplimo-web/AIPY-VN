@@ -298,6 +298,23 @@ class ApiService {
     });
   }
 
+  // Generic HTTP methods for backward compatibility
+  async get<T>(endpoint: string, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'GET' });
+  }
+
+  async post<T>(endpoint: string, body?: any, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'POST', body: body ? JSON.stringify(body) : undefined });
+  }
+
+  async put<T>(endpoint: string, body?: any, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'PUT', body: body ? JSON.stringify(body) : undefined });
+  }
+
+  async delete<T>(endpoint: string, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+  }
+
   // Auth
   async login(email: string, password: string) {
     const response = await this.request<{
@@ -369,13 +386,28 @@ class ApiService {
     return this.request<Product[]>(`/api/stores/${storeId}/products`);
   }
 
+  async getProductOffers(productId: string, lat?: number, lng?: number): Promise<{
+    offers: Array<{
+      store_id: string;
+      store_name: string;
+      distance_m: number;
+      price: number;
+      stock: number;
+      is_open_now: boolean;
+      map_url: string;
+    }>;
+  }> {
+    const query = lat !== undefined && lng !== undefined ? `?lat=${lat}&lng=${lng}` : '';
+    return this.request(`/api/products/${productId}/offers${query}`);
+  }
+
   // Cart
   async getCart(): Promise<{ items: CartItem[] }> {
     return this.request<{ items: CartItem[] }>('/api/cart');
   }
 
   async addToCart(productId: string, quantity: number = 1): Promise<{ items: CartItem[] }> {
-    return this.request<{ items: CartItem[] }>('/api/cart', {
+    return this.request<{ items: CartItem[] }>('/api/cart/items', {
       method: 'POST',
       body: JSON.stringify({ product_id: productId, quantity }),
     });
@@ -425,7 +457,7 @@ class ApiService {
   }): Promise<{ orders: Order[]; total: number; page: number; limit: number }> {
     const query = new URLSearchParams(params as any);
     return this.request<{ orders: Order[]; total: number; page: number; limit: number }>(
-      `/api/orders?${query}`
+      `/api/users/me/orders?${query}`
     );
   }
 
@@ -441,7 +473,7 @@ class ApiService {
 
   // User Profile
   async getProfile(): Promise<User> {
-    return this.request<User>('/api/users/me');
+    return this.request<User>('/api/auth/me');
   }
 
   async updateProfile(data: Partial<User>): Promise<User> {

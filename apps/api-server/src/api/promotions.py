@@ -139,7 +139,7 @@ async def list_promotions(
                     end_date=p.end_date,
                     status=p.status,
                     applicable_stores=p.applicable_stores or [],
-                    created_at=p.created_at,
+                    created_at=str(p.created_at) if p.created_at else None,
                 )
                 for p in promotions
             ],
@@ -209,7 +209,7 @@ async def create_promotion(
             end_date=new_promotion.end_date,
             status=new_promotion.status,
             applicable_stores=new_promotion.applicable_stores or [],
-            created_at=new_promotion.created_at,
+            created_at=str(new_promotion.created_at) if new_promotion.created_at else None,
         )
 
 
@@ -245,7 +245,7 @@ async def get_promotion(
             end_date=promotion.end_date,
             status=promotion.status,
             applicable_stores=promotion.applicable_stores or [],
-            created_at=promotion.created_at,
+            created_at=str(promotion.created_at) if promotion.created_at else None,
         )
 
 
@@ -310,7 +310,7 @@ async def update_promotion(
             end_date=db_promotion.end_date,
             status=db_promotion.status,
             applicable_stores=db_promotion.applicable_stores or [],
-            created_at=db_promotion.created_at,
+            created_at=str(db_promotion.created_at) if db_promotion.created_at else None,
         )
 
 
@@ -336,3 +336,122 @@ async def delete_promotion(
         await session.commit()
 
         return {"message": "Promotion deleted successfully"}
+
+
+class ValidatePromotionResponse(BaseModel):
+    valid: bool
+    discount: float
+    type: str
+    code: str
+    message: str
+
+
+@router.post("/validate/{code}", response_model=ValidatePromotionResponse)
+async def validate_promotion_code(
+    code: str,
+    order_amount: float = Query(..., ge=0, description="Current order subtotal"),
+    store_id: str | None = Query(None, description="Store ID to check applicability"),
+):
+    """Validate a promotion code against current order amount"""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Promotion).where(Promotion.code == code.upper())
+        )
+        promotion = result.scalar_one_or_none()
+
+        if not promotion:
+            return ValidatePromotionResponse(
+                valid=False,
+                discount=0,
+                type="",
+                code=code,
+                message="Mã giảm giá không tồn tại",
+            )
+
+        if promotion.status != "active":
+            return ValidatePromotionResponse(
+                valid=False,
+                discount=0,
+                type=promotion.type,
+                code=promotion.code,
+                message="Mã giảm giá không còn hiệu lực",
+            )
+
+        from datetime import datetime
+
+        now = datetime.now().isoformat()
+        if promotion.start_date and now < promotion.start_date:
+            return ValidatePromotionResponse(
+                valid=False,
+                discount=0,
+                type=promotion.type,
+                code=promotion.code,
+                message="Mã giảm giá chưa có hiệu lực",
+            )
+
+        if promotion.end_date and now > promotion.end_date:
+            return ValidatePromotionResponse(
+                valid=False,
+                discount=0,
+                type=promotion.type,
+                code=promotion.code,
+                message="Mã giảm giá đã hết hạn",
+            )
+
+        if promotion.min_order_amount and order_amount < float(
+            promotion.min_order_amount
+        ):
+            return ValidatePromotionResponse(
+                valid=False,
+                discount=0,
+                type=promotion.type,
+                code=promotion.code,
+                message=f"Đơn hàng tối thiểu {float(promotion.min_order_amount):,.0f}đ",
+            )
+
+        if (
+            promotion.usage_limit is not None
+            and promotion.used_count >= promotion.usage_limit
+        ):
+            return ValidatePromotionResponse(
+                valid=False,
+                discount=0,
+                type=promotion.type,
+                code=promotion.code,
+                message="Mã giảm giá đã hết lượt sử dụng",
+            )
+
+        if (
+            store_id
+            and promotion.applicable_stores
+            and "all" not in promotion.applicable_stores
+        ):
+            if store_id not in promotion.applicable_stores:
+                return ValidatePromotionResponse(
+                    valid=False,
+                    discount=0,
+                    type=promotion.type,
+                    code=promotion.code,
+                    message="Mã giảm giá không áp dụng cho cửa hàng này",
+                )
+
+        # Calculate discount
+        discount = 0.0
+        if promotion.type == "percentage" and promotion.value:
+            discount = order_amount * (float(promotion.value) / 100)
+            if promotion.max_discount:
+                discount = min(discount, float(promotion.max_discount))
+        elif promotion.type == "fixed" and promotion.value:
+            discount = float(promotion.value)
+            if promotion.max_discount:
+                discount = min(discount, float(promotion.max_discount))
+        elif promotion.type == "free_shipping":
+            discount = 0  # Special handling for free shipping
+
+        return ValidatePromotionResponse(
+            valid=True,
+            discount=discount,
+            type=promotion.type,
+            code=promotion.code,
+            message="Mã giảm giá hợp lệ",
+        )

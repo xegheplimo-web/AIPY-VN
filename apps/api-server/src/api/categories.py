@@ -97,8 +97,8 @@ async def get_categories(
                     description=cat.description,
                     icon=cat.icon,
                     is_active=cat.is_active,
-                    created_at=cat.created_at,
-                    updated_at=cat.updated_at,
+                    created_at=str(cat.created_at) if cat.created_at else None,
+                    updated_at=str(cat.updated_at) if cat.updated_at else None,
                 )
                 for cat in categories
             ],
@@ -129,8 +129,8 @@ async def get_category(category_id: str):
             description=category.description,
             icon=category.icon,
             is_active=category.is_active,
-            created_at=category.created_at,
-            updated_at=category.updated_at,
+            created_at=str(category.created_at) if category.created_at else None,
+            updated_at=str(category.updated_at) if category.updated_at else None,
         )
 
 
@@ -188,8 +188,8 @@ async def create_category(
             description=category.description,
             icon=category.icon,
             is_active=category.is_active,
-            created_at=category.created_at,
-            updated_at=category.updated_at,
+            created_at=str(category.created_at) if category.created_at else None,
+            updated_at=str(category.updated_at) if category.updated_at else None,
         )
 
 
@@ -246,8 +246,8 @@ async def update_category(
             description=category.description,
             icon=category.icon,
             is_active=category.is_active,
-            created_at=category.created_at,
-            updated_at=category.updated_at,
+            created_at=str(category.created_at) if category.created_at else None,
+            updated_at=str(category.updated_at) if category.updated_at else None,
         )
 
 

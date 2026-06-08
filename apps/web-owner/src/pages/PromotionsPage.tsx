@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Search, 
-  Percent,
+import {
   Calendar,
-  Tag,
   CheckCircle,
+  Clock,
+  Edit2,
+  Plus,
+  Search,
+  Tag,
+  Trash2,
   XCircle,
-  Clock
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import api from '../services/api';
 
 interface Promotion {
   id: string;
@@ -52,71 +53,30 @@ export default function PromotionsPage() {
 
   const loadPromotions = async () => {
     try {
-      // Mock data - sẽ thay bằng API call sau
-      const mockPromotions: Promotion[] = [
-        {
-          id: '1',
-          code: 'GIAM50K',
-          name: 'Giảm 50K cho đơn trên 300K',
-          type: 'fixed',
-          value: 50000,
-          minOrder: 300000,
-          maxDiscount: 50000,
-          startDate: new Date('2024-01-01'),
-          endDate: new Date('2024-12-31'),
-          usageLimit: 1000,
-          usedCount: 456,
-          status: 'active',
-          applicableStores: ['all'],
-        },
-        {
-          id: '2',
-          code: 'GIAM20%',
-          name: 'Giảm 20% toàn bộ',
-          type: 'percentage',
-          value: 20,
-          minOrder: 0,
-          maxDiscount: 200000,
-          startDate: new Date('2024-06-01'),
-          endDate: new Date('2024-06-30'),
-          usageLimit: 500,
-          usedCount: 234,
-          status: 'active',
-          applicableStores: ['all'],
-        },
-        {
-          id: '3',
-          code: 'FREESHIP',
-          name: 'Miễn phí ship',
-          type: 'free_shipping',
-          value: 0,
-          minOrder: 200000,
-          startDate: new Date('2024-01-01'),
-          endDate: new Date('2024-12-31'),
-          usageLimit: null,
-          usedCount: 789,
-          status: 'active',
-          applicableStores: ['all'],
-        },
-        {
-          id: '4',
-          code: 'FLASHSALE',
-          name: 'Flash sale 50%',
-          type: 'percentage',
-          value: 50,
-          minOrder: 100000,
-          maxDiscount: 500000,
-          startDate: new Date('2024-07-01'),
-          endDate: new Date('2024-07-07'),
-          usageLimit: 200,
-          usedCount: 0,
-          status: 'scheduled',
-          applicableStores: ['all'],
-        },
-      ];
-      setPromotions(mockPromotions);
+      setLoading(true);
+      const response = await api.getPromotions({ limit: 100 });
+
+      // Transform API response to match interface
+      const transformed = response.promotions.map((promo: any) => ({
+        id: promo.id,
+        code: promo.code,
+        name: promo.name,
+        type: promo.type,
+        value: promo.value,
+        minOrder: promo.min_order || 0,
+        maxDiscount: promo.max_discount,
+        startDate: new Date(promo.start_date),
+        endDate: new Date(promo.end_date),
+        usageLimit: promo.usage_limit,
+        usedCount: promo.used_count || 0,
+        status: promo.status,
+        applicableStores: promo.applicable_stores || ['all'],
+      }));
+
+      setPromotions(transformed);
     } catch (err) {
       console.error('Failed to load promotions:', err);
+      toast.error('Không thể tải danh sách khuyến mãi');
     } finally {
       setLoading(false);
     }
@@ -124,7 +84,21 @@ export default function PromotionsPage() {
 
   const handleAdd = async () => {
     try {
-      // Mock API call
+      const data = {
+        code: form.code,
+        name: form.name,
+        type: form.type,
+        value: parseFloat(form.value),
+        min_order: parseFloat(form.minOrder) || 0,
+        max_discount: form.maxDiscount ? parseFloat(form.maxDiscount) : undefined,
+        start_date: form.startDate,
+        end_date: form.endDate,
+        usage_limit: form.usageLimit ? parseInt(form.usageLimit) : undefined,
+        applicable_stores: ['all'],
+      };
+
+      await api.createPromotion(data);
+      toast.success('Đã tạo khuyến mãi thành công');
       setShowAddModal(false);
       setForm({
         code: '',
@@ -139,13 +113,30 @@ export default function PromotionsPage() {
       });
       loadPromotions();
     } catch (err) {
-      alert('Thêm khuyến mãi thất bại');
+      console.error('Failed to create promotion:', err);
+      toast.error('Thêm khuyến mãi thất bại');
     }
   };
 
   const handleEdit = async () => {
+    if (!editingPromotion) return;
+
     try {
-      // Mock API call
+      const data = {
+        code: form.code,
+        name: form.name,
+        type: form.type,
+        value: parseFloat(form.value),
+        min_order: parseFloat(form.minOrder) || 0,
+        max_discount: form.maxDiscount ? parseFloat(form.maxDiscount) : undefined,
+        start_date: form.startDate,
+        end_date: form.endDate,
+        usage_limit: form.usageLimit ? parseInt(form.usageLimit) : undefined,
+        applicable_stores: ['all'],
+      };
+
+      await api.updatePromotion(editingPromotion.id, data);
+      toast.success('Đã cập nhật khuyến mãi thành công');
       setEditingPromotion(null);
       setForm({
         code: '',
@@ -160,37 +151,39 @@ export default function PromotionsPage() {
       });
       loadPromotions();
     } catch (err) {
-      alert('Cập nhật khuyến mãi thất bại');
+      console.error('Failed to update promotion:', err);
+      toast.error('Cập nhật khuyến mãi thất bại');
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Bạn có chắc chắn muốn xóa khuyến mãi này?')) return;
     try {
-      // Mock API call
+      await api.deletePromotion(id);
+      toast.success('Đã xóa khuyến mãi thành công');
       loadPromotions();
     } catch (err) {
-      alert('Xóa khuyến mãi thất bại');
+      console.error('Failed to delete promotion:', err);
+      toast.error('Xóa khuyến mãi thất bại');
     }
   };
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     try {
-      setPromotions((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? { ...p, status: currentStatus === 'active' ? 'paused' : 'active' as const }
-            : p
-        )
-      );
+      const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+      await api.updatePromotion(id, { status: newStatus });
+      toast.success('Đã thay đổi trạng thái khuyến mãi');
+      loadPromotions();
     } catch (err) {
-      alert('Thay đổi trạng thái thất bại');
+      console.error('Failed to toggle promotion status:', err);
+      toast.error('Thay đổi trạng thái thất bại');
     }
   };
 
-  const filteredPromotions = promotions.filter((p) =>
-    p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPromotions = promotions.filter(
+    (p) =>
+      p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getStatusBadge = (status: string) => {
@@ -202,7 +195,9 @@ export default function PromotionsPage() {
     };
     const { label, color, icon: Icon } = config[status as keyof typeof config];
     return (
-      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${color}`}>
+      <span
+        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${color}`}
+      >
         <Icon size={12} /> {label}
       </span>
     );
@@ -275,8 +270,9 @@ export default function PromotionsPage() {
           <tbody>
             {filteredPromotions.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-gray-500">
-                  Không tìm thấy kết quả
+                <td colSpan={8} className="text-center py-12 text-gray-500">
+                  <Tag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p>Không tìm thấy kết quả</p>
                 </td>
               </tr>
             ) : (
@@ -310,7 +306,9 @@ export default function PromotionsPage() {
                   </td>
                   <td className="py-4 px-4 text-sm text-gray-600">
                     <div>{promo.startDate.toLocaleDateString('vi-VN')}</div>
-                    <div className="text-gray-400">→ {promo.endDate.toLocaleDateString('vi-VN')}</div>
+                    <div className="text-gray-400">
+                      → {promo.endDate.toLocaleDateString('vi-VN')}
+                    </div>
                   </td>
                   <td className="py-4 px-4">{getStatusBadge(promo.status)}</td>
                   <td className="py-4 px-4 text-right">
@@ -362,188 +360,137 @@ export default function PromotionsPage() {
         </table>
       </div>
 
-      {/* Add Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold mb-4">Tạo khuyến mãi mới</h2>
-            <div className="space-y-3">
-              <input
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                placeholder="Mã khuyến mãi (VD: GIAM50K)"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Tên khuyến mãi"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
-              <select
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value as any })}
-                className="w-full px-4 py-3 border rounded-lg"
-              >
-                <option value="percentage">Giảm theo %</option>
-                <option value="fixed">Giảm theo số tiền</option>
-                <option value="free_shipping">Miễn phí ship</option>
-              </select>
+      {/* Add/Edit Modal */}
+      {(showAddModal || editingPromotion) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingPromotion ? 'Chỉnh sửa khuyến mãi' : 'Tạo khuyến mãi mới'}
+              </h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mã khuyến mãi
+                </label>
+                <input
+                  type="text"
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="GIAM50K"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tên khuyến mãi
+                </label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Giảm 50K cho đơn trên 300K"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Loại khuyến mãi
+                </label>
+                <select
+                  value={form.type}
+                  onChange={(e) => setForm({ ...form, type: e.target.value as any })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="percentage">Phần trăm (%)</option>
+                  <option value="fixed">Cố định (₫)</option>
+                  <option value="free_shipping">Miễn phí ship</option>
+                </select>
+              </div>
               {form.type !== 'free_shipping' && (
                 <>
-                  <input
-                    value={form.value}
-                    onChange={(e) => setForm({ ...form, value: e.target.value })}
-                    placeholder={form.type === 'percentage' ? 'Giảm % (VD: 20)' : 'Giảm số tiền (VD: 50000)'}
-                    type="number"
-                    className="w-full px-4 py-3 border rounded-lg"
-                  />
-                  {form.type === 'percentage' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Giá trị {form.type === 'percentage' ? '(%)' : '(₫)'}
+                    </label>
                     <input
-                      value={form.maxDiscount}
-                      onChange={(e) => setForm({ ...form, maxDiscount: e.target.value })}
-                      placeholder="Giảm tối đa (VD: 200000)"
                       type="number"
-                      className="w-full px-4 py-3 border rounded-lg"
+                      value={form.value}
+                      onChange={(e) => setForm({ ...form, value: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder={form.type === 'percentage' ? '20' : '50000'}
                     />
+                  </div>
+                  {form.type === 'percentage' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Giảm tối đa (₫)
+                      </label>
+                      <input
+                        type="number"
+                        value={form.maxDiscount}
+                        onChange={(e) => setForm({ ...form, maxDiscount: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="200000"
+                      />
+                    </div>
                   )}
                 </>
               )}
-              <input
-                value={form.minOrder}
-                onChange={(e) => setForm({ ...form, minOrder: e.target.value })}
-                placeholder="Đơn tối thiểu (VD: 300000)"
-                type="number"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
-              <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Đơn tối thiểu (₫)
+                </label>
+                <input
+                  type="number"
+                  value={form.minOrder}
+                  onChange={(e) => setForm({ ...form, minOrder: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="300000"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-gray-600 mb-1 block">Ngày bắt đầu</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ngày bắt đầu
+                  </label>
                   <input
+                    type="date"
                     value={form.startDate}
                     onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                    type="date"
-                    className="w-full px-4 py-3 border rounded-lg"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600 mb-1 block">Ngày kết thúc</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ngày kết thúc
+                  </label>
                   <input
+                    type="date"
                     value={form.endDate}
                     onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                    type="date"
-                    className="w-full px-4 py-3 border rounded-lg"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
-              <input
-                value={form.usageLimit}
-                onChange={(e) => setForm({ ...form, usageLimit: e.target.value })}
-                placeholder="Giới hạn số lần sử dụng (để trống = vô hạn)"
-                type="number"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
-            </div>
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 py-3 border rounded-lg"
-              >
-                Hủy
-              </button>
-              <button onClick={handleAdd} className="flex-1 py-3 bg-blue-600 text-white rounded-lg">
-                Tạo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editingPromotion && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold mb-4">Chỉnh sửa khuyến mãi</h2>
-            <div className="space-y-3">
-              <input
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                placeholder="Mã khuyến mãi"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Tên khuyến mãi"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
-              <select
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value as any })}
-                className="w-full px-4 py-3 border rounded-lg"
-              >
-                <option value="percentage">Giảm theo %</option>
-                <option value="fixed">Giảm theo số tiền</option>
-                <option value="free_shipping">Miễn phí ship</option>
-              </select>
-              {form.type !== 'free_shipping' && (
-                <>
-                  <input
-                    value={form.value}
-                    onChange={(e) => setForm({ ...form, value: e.target.value })}
-                    placeholder="Giá trị"
-                    type="number"
-                    className="w-full px-4 py-3 border rounded-lg"
-                  />
-                  {form.type === 'percentage' && (
-                    <input
-                      value={form.maxDiscount}
-                      onChange={(e) => setForm({ ...form, maxDiscount: e.target.value })}
-                      placeholder="Giảm tối đa"
-                      type="number"
-                      className="w-full px-4 py-3 border rounded-lg"
-                    />
-                  )}
-                </>
-              )}
-              <input
-                value={form.minOrder}
-                onChange={(e) => setForm({ ...form, minOrder: e.target.value })}
-                placeholder="Đơn tối thiểu"
-                type="number"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm text-gray-600 mb-1 block">Ngày bắt đầu</label>
-                  <input
-                    value={form.startDate}
-                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                    type="date"
-                    className="w-full px-4 py-3 border rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600 mb-1 block">Ngày kết thúc</label>
-                  <input
-                    value={form.endDate}
-                    onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                    type="date"
-                    className="w-full px-4 py-3 border rounded-lg"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Giới hạn số lần sử dụng
+                </label>
+                <input
+                  type="number"
+                  value={form.usageLimit}
+                  onChange={(e) => setForm({ ...form, usageLimit: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="1000"
+                />
               </div>
-              <input
-                value={form.usageLimit}
-                onChange={(e) => setForm({ ...form, usageLimit: e.target.value })}
-                placeholder="Giới hạn số lần sử dụng"
-                type="number"
-                className="w-full px-4 py-3 border rounded-lg"
-              />
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="p-6 border-t flex gap-3 justify-end">
               <button
                 onClick={() => {
+                  setShowAddModal(false);
                   setEditingPromotion(null);
                   setForm({
                     code: '',
@@ -557,12 +504,15 @@ export default function PromotionsPage() {
                     usageLimit: '',
                   });
                 }}
-                className="flex-1 py-3 border rounded-lg"
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
               >
                 Hủy
               </button>
-              <button onClick={handleEdit} className="flex-1 py-3 bg-blue-600 text-white rounded-lg">
-                Cập nhật
+              <button
+                onClick={editingPromotion ? handleEdit : handleAdd}
+                className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              >
+                {editingPromotion ? 'Cập nhật' : 'Tạo'}
               </button>
             </div>
           </div>

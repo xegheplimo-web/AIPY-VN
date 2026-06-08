@@ -7,8 +7,11 @@ from sqlalchemy import (
     JSON,
     ForeignKey,
     CheckConstraint,
+    DateTime,
+    func as sa_func,
 )
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 import uuid
 
 from src.database import Base
@@ -28,7 +31,10 @@ class Review(Base):
     images = Column(JSON)  # Changed from ARRAY(String) to JSON for SQLite compatibility
     is_verified_purchase = Column(Boolean, default=False)
     helpful_count = Column(Integer, default=0)
-    created_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())
+
+    user = relationship("User", foreign_keys=[user_id])
 
     __table_args__ = (
         CheckConstraint("rating BETWEEN 1 AND 5", name="check_rating_range"),

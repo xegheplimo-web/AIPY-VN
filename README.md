@@ -77,7 +77,7 @@ npm install
 npm run dev  # Port 3002
 ```
 
-## � Project Structure
+## 📁 Project Structure
 
 ```
 AIPY-VN/
@@ -98,8 +98,19 @@ AIPY-VN/
 │   ├── web-owner/           # React owner app
 │   └── web-admin/           # React admin app
 ├── docker-compose.yml
+├── docker-compose.prod.yml
 ├── .env.example
-└── DEPLOYMENT.md
+├── .pre-commit-config.yaml
+├── .github/workflows/
+│   └── ci-cd.yml
+├── nginx/
+│   └── nginx.conf
+├── docs/
+│   ├── CI_CD.md
+│   ├── PRE_COMMIT.md
+│   └── DEMO_DATA_REPORT.md
+├── DEPLOYMENT.md
+└── README.md
 ```
 
 ## 🔐 Test Accounts
@@ -195,9 +206,24 @@ npm run build
 npm run preview
 ```
 
+### Pre-commit Hooks
+```bash
+# Install pre-commit
+pip install pre-commit
+pre-commit install
+
+# Run all hooks
+pre-commit run --all-files
+
+# Run specific hook
+pre-commit run ruff --all-files
+```
+
 ## 📚 Documentation
 
 - [Deployment Guide](DEPLOYMENT.md) - Full deployment instructions
+- [CI/CD Documentation](docs/CI_CD.md) - CI/CD pipeline and deployment system
+- [Pre-commit Hooks](docs/PRE_COMMIT.md) - Code quality and pre-commit configuration
 - [API Documentation](http://localhost:9000/docs) - Interactive API docs
 - [AGENTS.md](AGENTS.md) - Development guidelines
 
@@ -230,11 +256,24 @@ npm install
 
 ## 🤝 Contributing
 
-1. Create a feature branch
-2. Make your changes
-3. Test thoroughly
-4. Submit a pull request
+1. Install pre-commit hooks: `pre-commit install`
+2. Create a feature branch
+3. Make your changes
+4. Run pre-commit hooks: `pre-commit run --all-files`
+5. Test thoroughly
+6. Submit a pull request
 
-## � License
+## 📊 CI/CD
+
+The project uses GitHub Actions for CI/CD:
+- Automated testing on every push
+- Security scanning
+- Docker image building
+- Automated deployment to staging (develop branch)
+- Automated deployment to production (master branch)
+
+See [docs/CI_CD.md](docs/CI_CD.md) for details.
+
+## 📄 License
 
 MIT License - see LICENSE file for details

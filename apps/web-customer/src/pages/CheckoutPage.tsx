@@ -1,6 +1,7 @@
 import { ArrowLeft, Check, ChevronRight, CreditCard, MapPin, Package, Truck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { apiService } from '../services/api';
 import { calculateShippingFee, formatShippingFee } from '../utils/shipping';
 
 interface Product {
@@ -72,10 +73,73 @@ export default function CheckoutPage() {
       // Fallback: load from localStorage
       const saved = localStorage.getItem('cart');
       if (saved) {
-        const items = JSON.parse(saved);
-        // Simple grouping for fallback
-        const groups: StoreGroup[] = [];
-        setStoreGroups(groups);
+        try {
+          const rawItems = JSON.parse(saved);
+          const items: CartItem[] = rawItems.map((item: any) => ({
+            id: item.id || `local-${item.product_id}-${Date.now()}`,
+            product: {
+              id: item.product_id || item.product?.id || '',
+              name: item.product?.name || item.name || '',
+              price: item.product?.price || item.price || 0,
+              stock: item.product?.stock || item.stock || 999,
+              unit: item.product?.unit || item.unit || 'cái',
+              images: item.product?.images || item.images || [],
+            },
+            store: {
+              id: item.store_id || item.store?.id || 'unknown',
+              name: item.store_name || item.store?.name || 'Cửa hàng',
+              address: item.store?.address || '',
+              distanceKm: item.store?.distanceKm || item.distanceKm || 0,
+              isSameDistrict: item.store?.isSameDistrict ?? item.isSameDistrict ?? true,
+            },
+            quantity: item.quantity || 1,
+            unit_price: item.unit_price || item.price || 0,
+            subtotal: (item.unit_price || item.price || 0) * (item.quantity || 1),
+          }));
+          const grouped = Object.values(
+            items.reduce(
+              (groups: Record<string, StoreGroup>, item: CartItem) => {
+                const storeId = item.store.id;
+                if (!groups[storeId]) {
+                  groups[storeId] = {
+                    store: item.store,
+                    items: [],
+                    deliveryMethod: 'delivery',
+                    shippingFee: 0,
+                    isFreeShipping: false,
+                    storeTotal: 0,
+                  };
+                }
+                groups[storeId].items.push(item);
+                return groups;
+              },
+              {} as Record<string, StoreGroup>
+            )
+          ).map((group: StoreGroup) => {
+            const storeSubtotal = group.items.reduce((sum, item) => sum + item.subtotal, 0);
+            const weightKg = group.items.reduce((sum, item) => sum + item.quantity * 0.1, 0);
+            const distanceKm = group.store.distanceKm || 5;
+            const isSameDistrict = group.store.isSameDistrict !== false;
+            const shipping = calculateShippingFee({
+              distanceKm,
+              weightKg,
+              subtotal: storeSubtotal,
+              deliveryMethod: 'delivery',
+              isSameDistrict,
+            });
+            return {
+              ...group,
+              shippingFee: shipping.fee,
+              isFreeShipping: shipping.isFree,
+              storeTotal: storeSubtotal + shipping.fee,
+            };
+          });
+          setStoreGroups(grouped);
+          const calculatedTotal = grouped.reduce((sum, g) => sum + g.storeTotal, 0);
+          setTotal(calculatedTotal);
+        } catch (e) {
+          console.error('Failed to parse local cart:', e);
+        }
       }
     }
   }, [location.state]);

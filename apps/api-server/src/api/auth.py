@@ -151,7 +151,7 @@ async def register_user(data: UserRegisterRequest, request: Request):
                 "role": user.role,
                 "phone": user.phone,
                 "is_active": user.is_active,
-                "created_at": user.created_at or datetime.now().isoformat(),
+                "created_at": str(user.created_at) if user.created_at else datetime.now().isoformat(),
             },
         )
 
@@ -233,15 +233,111 @@ async def login_user(data: UserLoginRequest, request: Request):
                 "role": user.role,
                 "phone": user.phone,
                 "is_active": user.is_active,
-                "created_at": user.created_at or datetime.now().isoformat(),
+                "created_at": str(user.created_at) if user.created_at else datetime.now().isoformat(),
             },
         )
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request model for token refresh"""
+
+    refresh_token: str
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(data: RefreshTokenRequest):
+    """Refresh access token using refresh token"""
+    try:
+        jwt_service = get_jwt_service()
+        payload = jwt_service.decode_token(data.refresh_token)
+
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type",
+            )
+
+        user_id = payload.get("sub")
+
+        async with async_session() as session:
+            stmt = select(User).where(User.id == uuid.UUID(user_id))
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+
+            if not user or not user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found or deactivated",
+                )
+
+            # Generate new tokens
+            access_payload = {
+                "sub": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "type": "access",
+            }
+            new_access_token = jwt_service.create_token(access_payload, expires_in=3600)
+
+            refresh_payload = {
+                "sub": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "type": "refresh",
+            }
+            new_refresh_token = jwt_service.create_token(refresh_payload, expires_in=604800)
+
+            return TokenResponse(
+                access_token=new_access_token,
+                refresh_token=new_refresh_token,
+                token_type="bearer",
+                expires_in=3600,
+                user={
+                    "id": str(user.id),
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "role": user.role,
+                    "phone": user.phone,
+                    "is_active": user.is_active,
+                    "created_at": str(user.created_at) if user.created_at else datetime.now().isoformat(),
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Token refresh failed: {str(e)}",
+        )
+
+
+@router.get("/me")
+async def get_current_user(current_user=Depends(require_auth)):
+    """Get current user info from JWT token"""
+    user_id = current_user["id"]
+    async with async_session() as session:
+        stmt = select(User).where(User.id == uuid.UUID(user_id))
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "name": user.full_name,
+            "role": user.role,
+            "phone": user.phone,
+            "is_active": user.is_active,
+        }
 
 
 @router.post("/logout")
 async def logout_user(
     request: Request,
-    current_user: User = Depends(require_auth),
+    current_user=Depends(require_auth),
 ):
     """
     Logout user.
@@ -251,7 +347,7 @@ async def logout_user(
     """
     # Log logout
     await audit_logger.log_logout(
-        user_id=str(current_user.id),
+        user_id=current_user["id"],
         request=request,
     )
 

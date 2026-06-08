@@ -88,8 +88,8 @@ async def get_profile(current_user: User = Depends(require_auth)):
         role=current_user.role,
         is_verified=current_user.is_verified,
         is_active=current_user.is_active,
-        created_at=current_user.created_at,
-        updated_at=current_user.updated_at,
+        created_at=str(current_user.created_at) if current_user.created_at else None,
+        updated_at=str(current_user.updated_at) if current_user.updated_at else None,
     )
 
 
@@ -133,8 +133,8 @@ async def update_profile(
             role=current_user.role,
             is_verified=current_user.is_verified,
             is_active=current_user.is_active,
-            created_at=current_user.created_at,
-            updated_at=current_user.updated_at,
+            created_at=str(current_user.created_at) if current_user.created_at else None,
+            updated_at=str(current_user.updated_at) if current_user.updated_at else None,
         )
 
 
@@ -190,8 +190,8 @@ async def get_addresses(current_user: User = Depends(require_auth)):
                 is_default=addr.is_default,
                 latitude=addr.latitude,
                 longitude=addr.longitude,
-                created_at=addr.created_at,
-                updated_at=addr.updated_at,
+                created_at=str(addr.created_at) if addr.created_at else None,
+                updated_at=str(addr.updated_at) if addr.updated_at else None,
             )
             for addr in addresses
         ]
@@ -250,8 +250,8 @@ async def create_address(
             is_default=address.is_default,
             latitude=address.latitude,
             longitude=address.longitude,
-            created_at=address.created_at,
-            updated_at=address.updated_at,
+            created_at=str(address.created_at) if address.created_at else None,
+            updated_at=str(address.updated_at) if address.updated_at else None,
         )
 
 

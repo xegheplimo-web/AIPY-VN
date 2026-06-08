@@ -121,7 +121,7 @@ class StripeConfig(BaseModel):
     secret_key: str = Field(default="", alias="STRIPE_SECRET_KEY")
     publishable_key: str = Field(default="", alias="STRIPE_PUBLISHABLE_KEY")
     webhook_secret: str = Field(default="", alias="STRIPE_WEBHOOK_SECRET")
-    currency: str = Field(default="usd", alias="STRIPE_CURRENCY")
+    currency: str = Field(default="vnd", alias="STRIPE_CURRENCY")
 
     def is_configured(self) -> bool:
         """Check if Stripe is properly configured."""

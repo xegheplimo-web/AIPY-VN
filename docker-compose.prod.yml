@@ -1,50 +1,236 @@
-version: "3.9"
+# Production Docker Compose Configuration
+# For production deployment
+
+version: '3.8'
 
 services:
-  db:
-    image: postgres:16
+  # PostgreSQL with PostGIS
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: vietstore-postgres-prod
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-vietstore}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - vietstore-network
+    restart: always
 
+  # Redis
   redis:
     image: redis:7-alpine
+    container_name: vietstore-redis-prod
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - vietstore-network
+    restart: always
 
-  api-server:
-    build:
-      context: ./apps/api-server
-      dockerfile: Dockerfile
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: vietstore-qdrant-prod
+    volumes:
+      - qdrant_data:/qdrant/storage
     ports:
-      - "8000:8000"
+      - "6333:6333"
+      - "6334:6334"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vietstore-network
+    restart: always
+
+  # API Server
+  api-server:
+    image: ${DOCKER_REGISTRY}/vietstore-api:${IMAGE_TAG:-latest}
+    container_name: vietstore-api-prod
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-vietstore}
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      ENVIRONMENT: production
+      DEBUG: false
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ES256
+      ECC_PRIVATE_KEY_PEM: ${ECC_PRIVATE_KEY_PEM}
+      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY}
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_ENVIRONMENT: production
+      SENTRY_TRACES_SAMPLE_RATE: 0.1
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-
-  qdrant:
-    image: qdrant/qdrant:latest
+      qdrant:
+        condition: service_healthy
     ports:
-      - "6333:6333"
+      - "9000:9000"
     volumes:
-      - qdrant_storage:/qdrant/storage
+      - data:/app/data
+      - logs:/app/logs
+    networks:
+      - vietstore-network
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Customer App
+  web-customer:
+    image: ${DOCKER_REGISTRY}/vietstore-customer:${IMAGE_TAG:-latest}
+    container_name: vietstore-customer-prod
+    environment:
+      VITE_API_URL: ${API_URL}
+    depends_on:
+      - api-server
+    ports:
+      - "3000:80"
+    networks:
+      - vietstore-network
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Owner App
+  web-owner:
+    image: ${DOCKER_REGISTRY}/vietstore-owner:${IMAGE_TAG:-latest}
+    container_name: vietstore-owner-prod
+    environment:
+      VITE_API_URL: ${API_URL}
+    depends_on:
+      - api-server
+    ports:
+      - "3001:80"
+    networks:
+      - vietstore-network
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Admin App
+  web-admin:
+    image: ${DOCKER_REGISTRY}/vietstore-admin:${IMAGE_TAG:-latest}
+    container_name: vietstore-admin-prod
+    environment:
+      VITE_API_URL: ${API_URL}
+    depends_on:
+      - api-server
+    ports:
+      - "3002:80"
+    networks:
+      - vietstore-network
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: vietstore-nginx-prod
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - web-customer
+      - web-owner
+      - web-admin
+      - api-server
+    networks:
+      - vietstore-network
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prometheus (Monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vietstore-prometheus-prod
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    networks:
+      - vietstore-network
+    restart: always
+
+  # Grafana (Monitoring Dashboard)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vietstore-grafana-prod
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_URL}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    ports:
+      - "3003:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - vietstore-network
+    restart: always
 
 volumes:
-  pgdata:
-  qdrant_storage:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  data:
+  logs:
+  nginx_logs:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  vietstore-network:
+    driver: bridge

@@ -1,5 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
-import ErrorBoundary from './components/ErrorBoundary';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import OwnerLayout from './components/layout/OwnerLayout';
 import { AuthProvider } from './contexts/AuthContext';
 import BulkUploadPage from './pages/BulkUploadPage';

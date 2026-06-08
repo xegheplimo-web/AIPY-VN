@@ -1,6 +1,7 @@
 import { ArrowLeft, Check, MapPin, Minus, Plus, ShoppingBag, Store, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import apiService from '../services/api';
 import { calculateShippingFee, formatShippingFee } from '../utils/shipping';
 
 interface Product {
@@ -45,6 +46,7 @@ export default function CartPage() {
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoValidating, setPromoValidating] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -53,11 +55,10 @@ export default function CartPage() {
 
   const loadCart = async () => {
     try {
-      const res = await apiService.get('/cart/');
-      const items = res.data.items || [];
+      const data = await apiService.getCart();
+      const items: CartItem[] = data.items || [];
       setCartItems(items);
 
-      // Initialize delivery methods (default to delivery)
       const methods: Record<string, 'pickup' | 'delivery'> = {};
       items.forEach((item: CartItem) => {
         if (!methods[item.store.id]) {
@@ -66,19 +67,46 @@ export default function CartPage() {
       });
       setDeliveryMethods(methods);
     } catch (err) {
+      console.error('Failed to load cart from server:', err);
       // Fallback: load from localStorage
       const saved = localStorage.getItem('cart');
       if (saved) {
-        const items = JSON.parse(saved);
-        setCartItems(items);
+        try {
+          const items = JSON.parse(saved);
+          // Normalize local items to CartItem shape
+          const normalized: CartItem[] = items.map((item: any) => ({
+            id: item.id || `local-${item.product_id}-${Date.now()}`,
+            product: {
+              id: item.product_id || item.product?.id || '',
+              name: item.product?.name || item.name || '',
+              price: item.product?.price || item.price || 0,
+              stock: item.product?.stock || item.stock || 999,
+              unit: item.product?.unit || item.unit || 'cái',
+              images: item.product?.images || item.images || [],
+            },
+            store: {
+              id: item.store_id || item.store?.id || 'unknown',
+              name: item.store_name || item.store?.name || 'Cửa hàng',
+              address: item.store?.address || '',
+              distanceKm: item.store?.distanceKm || 0,
+              isSameDistrict: item.store?.isSameDistrict ?? true,
+            },
+            quantity: item.quantity || 1,
+            unit_price: item.unit_price || item.price || 0,
+            subtotal: (item.unit_price || item.price || 0) * (item.quantity || 1),
+          }));
+          setCartItems(normalized);
 
-        const methods: Record<string, 'pickup' | 'delivery'> = {};
-        items.forEach((item: CartItem) => {
-          if (!methods[item.store.id]) {
-            methods[item.store.id] = 'delivery';
-          }
-        });
-        setDeliveryMethods(methods);
+          const methods: Record<string, 'pickup' | 'delivery'> = {};
+          normalized.forEach((item) => {
+            if (!methods[item.store.id]) {
+              methods[item.store.id] = 'delivery';
+            }
+          });
+          setDeliveryMethods(methods);
+        } catch (e) {
+          console.error('Failed to parse local cart:', e);
+        }
       }
     } finally {
       setLoading(false);
@@ -88,10 +116,10 @@ export default function CartPage() {
   const updateQuantity = async (itemId: string, newQty: number) => {
     if (newQty < 1) return;
     try {
-      await apiService.put(`/cart/items/${itemId}`, { quantity: newQty });
+      await apiService.updateCartItem(itemId, newQty);
       loadCart();
     } catch (err) {
-      // Update local state
+      console.error('Failed to update quantity on server:', err);
       setCartItems((prev) =>
         prev.map((item) =>
           item.id === itemId
@@ -99,15 +127,28 @@ export default function CartPage() {
             : item
         )
       );
+      // Sync localStorage
+      const local = JSON.parse(localStorage.getItem('cart') || '[]');
+      const updatedLocal = local.map((item: any) =>
+        (item.id === itemId || item.product_id === itemId)
+          ? { ...item, quantity: newQty, subtotal: (item.unit_price || item.price) * newQty }
+          : item
+      );
+      localStorage.setItem('cart', JSON.stringify(updatedLocal));
     }
   };
 
   const removeItem = async (itemId: string) => {
     try {
-      await apiService.delete(`/cart/items/${itemId}`);
+      await apiService.removeFromCart(itemId);
       loadCart();
     } catch (err) {
+      console.error('Failed to remove item on server:', err);
       setCartItems((prev) => prev.filter((item) => item.id !== itemId));
+      const local = JSON.parse(localStorage.getItem('cart') || '[]').filter(
+        (item: any) => item.id !== itemId && item.product_id !== itemId
+      );
+      localStorage.setItem('cart', JSON.stringify(local));
     }
   };
 
@@ -115,15 +156,25 @@ export default function CartPage() {
     setDeliveryMethods((prev) => ({ ...prev, [storeId]: method }));
   };
 
-  const applyPromoCode = () => {
-    if (promoCode === 'GIAM50K') {
-      setPromoApplied(true);
-      setPromoDiscount(50000);
-    } else if (promoCode === 'GIAM100K') {
-      setPromoApplied(true);
-      setPromoDiscount(100000);
-    } else {
-      alert('Mã giảm giá không hợp lệ');
+  const applyPromoCode = async () => {
+    if (!promoCode.trim()) {
+      alert('Vui lòng nhập mã giảm giá');
+      return;
+    }
+    const currentSubtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+    try {
+      const res = await apiService.validatePromotion(promoCode, currentSubtotal);
+      if (res.valid) {
+        setPromoApplied(true);
+        setPromoDiscount(res.discount);
+      } else {
+        alert('Mã giảm giá không hợp lệ');
+        setPromoApplied(false);
+        setPromoDiscount(0);
+      }
+    } catch (err) {
+      console.error('Promo validation failed:', err);
+      alert('Không thể kiểm tra mã giảm giá. Vui lòng thử lại sau.');
     }
   };
 
@@ -180,7 +231,7 @@ export default function CartPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
       </div>
     );
   }
@@ -381,10 +432,10 @@ export default function CartPage() {
           />
           <button
             onClick={applyPromoCode}
-            disabled={promoApplied}
+            disabled={promoApplied || promoValidating}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            Áp dụng
+            {promoValidating ? 'Đang kiểm tra...' : 'Áp dụng'}
           </button>
         </div>
         {promoApplied && (

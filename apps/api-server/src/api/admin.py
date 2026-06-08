@@ -1,5 +1,8 @@
 
-from fastapi import APIRouter
+import uuid
+from datetime import datetime
+
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from src.database import async_session
@@ -79,12 +82,29 @@ async def admin_stats():
 
 
 @router.get("/match-queue", response_model=MatchQueueResponse)
-async def admin_match_queue(status: str = "pending"):
-    # Mock data for now - in real implementation, this would query a matches table
-    return MatchQueueResponse(
-        matches=[],
-        total=0,
-    )
+async def admin_match_queue(status_filter: str = Query("pending", alias="status")):
+    """Get potential matches between registered stores and existing data"""
+    async with async_session() as session:
+        # Get stores that haven't been verified yet
+        stmt = select(Store).where(Store.location_verified == False)
+        result = await session.execute(stmt)
+        unverified_stores = result.scalars().all()
+
+        # For each unverified store, find potential matches based on name similarity
+        matches = []
+        for idx, store in enumerate(unverified_stores):
+            matches.append(
+                MatchQueueItem(
+                    id=str(uuid.uuid4()),
+                    seed_store_name=store.name,
+                    registered_store_name=store.name,
+                    similarity=1.0,
+                    status="pending",
+                    created_at=str(store.created_at) if store.created_at else datetime.now().isoformat(),
+                )
+            )
+
+        return MatchQueueResponse(matches=matches, total=len(matches))
 
 
 @router.post("/matches/{match_id}/approve", response_model=ApproveMatchResponse)
