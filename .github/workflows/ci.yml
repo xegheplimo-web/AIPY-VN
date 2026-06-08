@@ -77,7 +77,7 @@ jobs:
         working-directory: apps/api-server
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/vietstore_test
-        run: uv run pytest tests/ -v --cov=src/ --cov-report=xml || echo "No tests yet"
+        run: uv run pytest tests/ -v --cov=src/ --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
