@@ -240,8 +240,8 @@ async def login_user(data: UserLoginRequest, request: Request):
 
 @router.post("/logout")
 async def logout_user(
-    current_user: User = Depends(require_auth),
     request: Request,
+    current_user: User = Depends(require_auth),
 ):
     """
     Logout user.
