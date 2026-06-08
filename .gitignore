@@ -1,87 +1,139 @@
+```
 # Dependencies
 node_modules/
-.pnpm-store/
-.next/
-dist/
-build/
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-ENV/
-env/
-uv.lock
 
-# Environment variables
+# Environment
 .env
 .env.local
-.env.*.local
-*.key
-*.pem
+*.env.*
 
-# IDEs
+# Logs
+*.log
+
+# Build artifacts
+dist/
+build/
+target/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+.MF
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+node_modules/
+jspm_packages/
+web_modules/
+*.tsbuildinfo
+.nyc_output
+coverage/
+.nyc_output/
+.coverage/
+lib-cov/
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
-
-# Build outputs
-.turbo/
-dist-ssr/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# Testing
-coverage/
-.nyc_output/
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-data/
-
-# AI/ML models
-*.pkl
-*.h5
-*.pt
-*.pth
-/models/
-checkpoints/
-
-# Exception: source code models
-!apps/api-server/src/models/
-
-# Temporary files
-*.tmp
-*.temp
-.cache/
-.parcel-cache/
 
 # OS
 .DS_Store
 Thumbs.db
-desktop.ini
+ehthumbs.db
+Icon?
+.directory
+*.nib
+*.db
+*.sqlite
+*.sqlite3
+*.fdb
+*.fdb-shm
+*.fdb-wal
 
-# Python specific
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyreplcache
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Logs
-logs/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Translations
+*.mo
+*.pot
+
+# Django
 *.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+.env
+
+# Flask
+instance/
+.webassets-cache
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Docker
+.dockerignore
+!docker-compose.yml
+!Dockerfile
+
+# Temporary folders
+tmp/
+temp/
+```

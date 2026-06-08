@@ -4,6 +4,7 @@ import {
   Heart,
   LogOut,
   MapPin,
+  MessageSquare,
   Save,
   ShoppingBag,
   User,
@@ -11,7 +12,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiService } from '../services/api';
 import { Form, FormCheckbox, FormField, FormSelect } from '../components/forms';
 import { userProfileSchema, type UserProfileFormData } from '../lib/validations';
 import { apiService } from '../services/api';
@@ -31,8 +31,9 @@ export default function UserProfilePage() {
 
   const menuItems = [
     { icon: ShoppingBag, label: 'Đơn hàng của tôi', href: '/orders', badge: null },
-    { icon: Heart, label: 'Sản phẩm yêu thích', href: '#', badge: null },
-    { icon: MapPin, label: 'Địa chỉ giao hàng', href: '#', badge: null },
+    { icon: Heart, label: 'Sản phẩm yêu thích', href: '/favorites', badge: null },
+    { icon: MessageSquare, label: 'Đánh giá của tôi', href: '/reviews', badge: null },
+    { icon: MapPin, label: 'Địa chỉ giao hàng', href: '/addresses', badge: null },
   ];
 
   const handleProfileUpdate = async (data: UserProfileFormData) => {
@@ -65,7 +66,7 @@ export default function UserProfilePage() {
     pushNotifications: true,
   };
 
-  if (fetching) {
+  if (!user) {
     return (
       <div className="max-w-lg mx-auto p-4 pb-8">
         <div className="h-32 bg-gray-100 rounded-2xl animate-pulse mb-6" />

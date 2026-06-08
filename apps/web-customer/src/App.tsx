@@ -16,6 +16,9 @@ const StoreDetailPage = lazy(() => import('./pages/StoreDetailPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
 const StoreChatPage = lazy(() => import('./pages/StoreChatPage'));
 const StoreLocatorPage = lazy(() => import('./pages/StoreLocatorPage'));
+const FavoritesPage = lazy(() => import('./pages/FavoritesPage'));
+const ReviewsPage = lazy(() => import('./pages/ReviewsPage'));
+const AddressBookPage = lazy(() => import('./pages/AddressBookPage'));
 
 function LoadingFallback() {
   return (
@@ -44,6 +47,9 @@ export default function App() {
                   <Route path="profile" element={<UserProfilePage />} />
                   <Route path="chat" element={<StoreChatPage />} />
                   <Route path="locator" element={<StoreLocatorPage />} />
+                  <Route path="favorites" element={<FavoritesPage />} />
+                  <Route path="reviews" element={<ReviewsPage />} />
+                  <Route path="addresses" element={<AddressBookPage />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
