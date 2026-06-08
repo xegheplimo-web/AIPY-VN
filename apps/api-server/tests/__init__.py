@@ -1,3 +1,1 @@
-"""
-Test package for VietStore RAG API.
-"""
+"""Test suite for VietStore RAG API"""
