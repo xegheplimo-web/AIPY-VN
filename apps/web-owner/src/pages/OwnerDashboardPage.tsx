@@ -43,7 +43,7 @@ export default function OwnerDashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen p-4 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
       </div>
     );
   }
@@ -52,25 +52,25 @@ export default function OwnerDashboardPage() {
     ? [
         {
           icon: Package,
-          label: 'Tong san pham',
+          label: 'Tổng sản phẩm',
           value: stats.total_products.toString(),
           trend: '',
         },
         {
           icon: ShoppingCart,
-          label: 'Don cho xu ly',
+          label: 'Đơn chờ xử lý',
           value: stats.pending_orders.toString(),
           trend: '',
         },
         {
           icon: DollarSign,
-          label: 'Doanh thu thang',
+          label: 'Doanh thu tháng',
           value: `${(stats.monthly_revenue / 1000000).toFixed(1)}M`,
           trend: '',
         },
         {
           icon: Star,
-          label: 'Danh gia TB',
+          label: 'Đánh giá TB',
           value: stats.average_rating.toFixed(1),
           trend: '',
         },
@@ -99,20 +99,20 @@ export default function OwnerDashboardPage() {
         <div className="grid grid-cols-2 gap-4 mb-6">
           <Link to="/products" className="p-6 bg-blue-50 rounded-xl hover:bg-blue-100 text-center">
             <Package className="w-8 h-8 mx-auto text-blue-600 mb-2" />
-            <p className="font-medium text-blue-900">Quan ly san pham</p>
+            <p className="font-medium text-blue-900">Quản lý sản phẩm</p>
           </Link>
           <Link to="/orders" className="p-6 bg-green-50 rounded-xl hover:bg-green-100 text-center">
             <ShoppingCart className="w-8 h-8 mx-auto text-green-600 mb-2" />
-            <p className="font-medium text-green-900">Quan ly don hang</p>
+            <p className="font-medium text-green-900">Quản lý đơn hàng</p>
           </Link>
         </div>
 
         {/* Recent Orders */}
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
           <div className="p-4 border-b flex justify-between items-center">
-            <h2 className="font-semibold">Don hang gan day</h2>
+            <h2 className="font-semibold">Đơn hàng gần đây</h2>
             <Link to="/orders" className="text-blue-600 text-sm hover:underline">
-              Xem tat ca
+              Xem tất cả
             </Link>
           </div>
           {stats && stats.recent_orders.length > 0 ? (
