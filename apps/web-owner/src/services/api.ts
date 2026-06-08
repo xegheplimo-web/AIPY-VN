@@ -181,6 +181,23 @@ class ApiService {
     });
   }
 
+  // Generic HTTP methods for backward compatibility
+  async get<T>(endpoint: string, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'GET' });
+  }
+
+  async post<T>(endpoint: string, body?: any, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'POST', body: body ? JSON.stringify(body) : undefined });
+  }
+
+  async put<T>(endpoint: string, body?: any, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'PUT', body: body ? JSON.stringify(body) : undefined });
+  }
+
+  async delete<T>(endpoint: string, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+  }
+
   // Auth
   async login(email: string, password: string) {
     const response = await this.request<{
