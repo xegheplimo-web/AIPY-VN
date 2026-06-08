@@ -95,15 +95,37 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error(f"Session key cleanup error: {e}", exc_info=True)
 
-    # Start the cleanup task
+    # Start background task for key rotation
+    async def key_rotation_scheduler():
+        """Periodically check and rotate ECC keys."""
+        while True:
+            try:
+                await asyncio.sleep(86400)  # Run every 24 hours
+                from src.services.key_rotation import key_rotation_service
+
+                validation = await key_rotation_service.validate_key_rotation()
+                if validation.get("needs_rotation"):
+                    logger.info("Initiating scheduled key rotation...")
+                    result = await key_rotation_service.rotate_key()
+                    logger.info(f"Rotation result: {result}")
+            except Exception as e:
+                logger.error(f"Key rotation scheduler error: {e}", exc_info=True)
+
+    # Start the cleanup tasks
     cleanup_task = asyncio.create_task(cleanup_session_keys())
+    rotation_task = asyncio.create_task(key_rotation_scheduler())
 
     yield
 
     # Cleanup on shutdown
     cleanup_task.cancel()
+    rotation_task.cancel()
     try:
         await cleanup_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await rotation_task
     except asyncio.CancelledError:
         pass
 
@@ -205,6 +227,11 @@ app.include_router(categories, prefix=api_v1_prefix)
 app.include_router(favorites, prefix=api_v1_prefix)
 app.include_router(store_locator, prefix=api_v1_prefix)
 app.include_router(geo, prefix=api_v1_prefix)
+
+# Add key rotation router
+from src.services.key_rotation import rotation_router
+
+app.include_router(rotation_router, prefix=api_v1_prefix)
 
 # WebSocket routes
 app.include_router(websocket)
