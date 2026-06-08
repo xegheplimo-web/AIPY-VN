@@ -41,6 +41,7 @@ from src.middleware import (
     LoggingMiddleware,
     RateLimitMiddleware,
     RequestValidationMiddleware,
+    SecurityHeadersMiddleware,
     setup_error_handlers,
 )
 from src.sentry_config import init_sentry
@@ -142,6 +143,9 @@ app.add_middleware(RequestValidationMiddleware)
 app.add_middleware(BodySizeLimitMiddleware, max_size=10 * 1024 * 1024)  # 10MB
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(RateLimitMiddleware, max_requests=200, window=60)
+
+# Security headers middleware (always enabled)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Enable authentication middleware in production
 if config.is_production:

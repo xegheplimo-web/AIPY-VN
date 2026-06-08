@@ -12,6 +12,7 @@ from .csrf import CSRFMiddleware
 from .error_handler import setup_error_handlers
 from .logging_middleware import LoggingMiddleware
 from .rate_limiter import RateLimitMiddleware
+from .security_headers import SecurityHeadersMiddleware
 from .validation import RequestValidationMiddleware
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "LoggingMiddleware",
     "RateLimitMiddleware",
     "RequestValidationMiddleware",
+    "SecurityHeadersMiddleware",
     "get_current_user",
     "require_admin",
     "require_auth",
