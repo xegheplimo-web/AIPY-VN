@@ -29,10 +29,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('auth_token');
     if (token) {
       apiService.setToken(token);
-      // TODO: Validate token and get user info
-      setUser({ id: '1', email: 'user@example.com', name: 'User', phone: null, role: 'customer' });
+      // Fetch real user info from API
+      apiService.getProfile().then((profile) => {
+        setUser({
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          phone: profile.phone,
+          role: (profile as any).role || 'customer',
+        });
+      }).catch(() => {
+        // Token is invalid, clear it
+        apiService.clearToken();
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+      }).finally(() => {
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {

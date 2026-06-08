@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import StatCard from '../components/dashboard/StatCard';
-import api from '../services/api';
+import apiService from '../services/api';
 
 interface DashboardStats {
   total_products: number;
@@ -19,6 +19,17 @@ interface DashboardStats {
   }>;
 }
 
+// Map API response to dashboard stats
+function mapDashboardResponse(data: any): DashboardStats {
+  return {
+    total_products: data.total_products ?? data.products ?? 0,
+    pending_orders: data.pending_orders ?? data.orders ?? 0,
+    monthly_revenue: data.monthly_revenue ?? data.revenue ?? 0,
+    average_rating: data.average_rating ?? 0,
+    recent_orders: data.recent_orders ?? [],
+  };
+}
+
 export default function OwnerDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,8 +41,8 @@ export default function OwnerDashboardPage() {
   const loadDashboardStats = async () => {
     try {
       setLoading(true);
-      const response = await api.getDashboardStats();
-      setStats(response);
+      const response = await apiService.getDashboardStats();
+      setStats(mapDashboardResponse(response));
     } catch (err) {
       console.error('Failed to load dashboard stats:', err);
       toast.error('Không thể tải thống kê dashboard');

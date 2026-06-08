@@ -126,8 +126,8 @@ async def list_reports(
                     evidence=r.evidence,
                     resolution_notes=r.resolution_notes,
                     resolved_by=str(r.resolved_by) if r.resolved_by else None,
-                    resolved_at=r.resolved_at,
-                    created_at=r.created_at,
+                    resolved_at=str(r.resolved_at) if r.resolved_at else None,
+                    created_at=str(r.created_at) if r.created_at else None,
                 )
                 for r in reports
             ],
@@ -177,8 +177,8 @@ async def create_report(
             evidence=new_report.evidence,
             resolution_notes=new_report.resolution_notes,
             resolved_by=str(new_report.resolved_by) if new_report.resolved_by else None,
-            resolved_at=new_report.resolved_at,
-            created_at=new_report.created_at,
+            resolved_at=str(new_report.resolved_at) if new_report.resolved_at else None,
+            created_at=str(new_report.created_at) if new_report.created_at else None,
         )
 
 
@@ -210,8 +210,8 @@ async def get_report(
             evidence=report.evidence,
             resolution_notes=report.resolution_notes,
             resolved_by=str(report.resolved_by) if report.resolved_by else None,
-            resolved_at=report.resolved_at,
-            created_at=report.created_at,
+            resolved_at=str(report.resolved_at) if report.resolved_at else None,
+            created_at=str(report.created_at) if report.created_at else None,
         )
 
 
@@ -259,6 +259,6 @@ async def update_report(
             evidence=db_report.evidence,
             resolution_notes=db_report.resolution_notes,
             resolved_by=str(db_report.resolved_by) if db_report.resolved_by else None,
-            resolved_at=db_report.resolved_at,
-            created_at=db_report.created_at,
+            resolved_at=str(db_report.resolved_at) if db_report.resolved_at else None,
+            created_at=str(db_report.created_at) if db_report.created_at else None,
         )

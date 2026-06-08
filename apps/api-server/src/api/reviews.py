@@ -130,8 +130,8 @@ async def create_review(
             product_id=str(review.product_id) if review.product_id else None,
             rating=review.rating,
             comment=review.comment,
-            created_at=review.created_at,
-            updated_at=review.updated_at,
+            created_at=str(review.created_at) if review.created_at else None,
+            updated_at=str(review.updated_at) if review.updated_at else None,
         )
 
 
@@ -280,8 +280,8 @@ async def get_review(review_id: str):
             product_id=str(review.product_id) if review.product_id else None,
             rating=review.rating,
             comment=review.comment,
-            created_at=review.created_at,
-            updated_at=review.updated_at,
+            created_at=str(review.created_at) if review.created_at else None,
+            updated_at=str(review.updated_at) if review.updated_at else None,
         )
 
 
@@ -328,8 +328,8 @@ async def update_review(
             product_id=str(review.product_id) if review.product_id else None,
             rating=review.rating,
             comment=review.comment,
-            created_at=review.created_at,
-            updated_at=review.updated_at,
+            created_at=str(review.created_at) if review.created_at else None,
+            updated_at=str(review.updated_at) if review.updated_at else None,
         )
 
 

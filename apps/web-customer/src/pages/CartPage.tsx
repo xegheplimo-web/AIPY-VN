@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, MapPin, Minus, Plus, ShoppingBag, Store, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiService } from '../services/api';
+import apiService from '../services/api';
 import { calculateShippingFee, formatShippingFee } from '../utils/shipping';
 
 interface Product {
@@ -46,6 +46,7 @@ export default function CartPage() {
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoValidating, setPromoValidating] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,8 +55,8 @@ export default function CartPage() {
 
   const loadCart = async () => {
     try {
-      const res: any = await apiService.getCart();
-      const items: CartItem[] = res.items || [];
+      const data = await apiService.getCart();
+      const items: CartItem[] = data.items || [];
       setCartItems(items);
 
       const methods: Record<string, 'pickup' | 'delivery'> = {};
@@ -155,15 +156,22 @@ export default function CartPage() {
     setDeliveryMethods((prev) => ({ ...prev, [storeId]: method }));
   };
 
-  const applyPromoCode = () => {
-    if (promoCode === 'GIAM50K') {
-      setPromoApplied(true);
-      setPromoDiscount(50000);
-    } else if (promoCode === 'GIAM100K') {
-      setPromoApplied(true);
-      setPromoDiscount(100000);
-    } else {
+  const applyPromoCode = async () => {
+    if (!promoCode.trim()) return;
+    setPromoValidating(true);
+    try {
+      const subtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+      const result = await apiService.validatePromotion(promoCode, subtotal);
+      if (result.valid) {
+        setPromoApplied(true);
+        setPromoDiscount(result.discount);
+      } else {
+        alert('Mã giảm giá không hợp lệ hoặc không đủ điều kiện');
+      }
+    } catch (err) {
       alert('Mã giảm giá không hợp lệ');
+    } finally {
+      setPromoValidating(false);
     }
   };
 
@@ -421,10 +429,10 @@ export default function CartPage() {
           />
           <button
             onClick={applyPromoCode}
-            disabled={promoApplied}
+            disabled={promoApplied || promoValidating}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            Áp dụng
+            {promoValidating ? 'Đang kiểm tra...' : 'Áp dụng'}
           </button>
         </div>
         {promoApplied && (

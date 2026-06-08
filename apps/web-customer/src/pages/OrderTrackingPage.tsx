@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { apiService } from '../services/api';
+import apiService from '../services/api';
 
 interface OrderItem {
   id: string;

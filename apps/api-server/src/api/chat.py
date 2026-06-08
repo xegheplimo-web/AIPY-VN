@@ -15,6 +15,7 @@ from fastapi import (
 )
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 from src.agents import get_shopping_agent
 from src.database import async_session
 from src.middleware.auth_middleware import require_auth
@@ -149,7 +150,7 @@ async def get_store_messages(
                 content=m.content,
                 message_type=m.message_type,
                 is_read=m.is_read,
-                created_at=m.created_at or datetime.now().isoformat(),
+                created_at=str(m.created_at) if m.created_at else datetime.now().isoformat(),
             )
             for m in messages
         ]
@@ -338,28 +339,94 @@ async def chat_search(request: ChatSearchRequest):
     """
     AI-powered chat search using Shopping Agent.
 
-    This endpoint uses the AI agent to generate intelligent search responses
-    based on user queries and context.
+    This endpoint performs a real DB search for products/stores,
+    then optionally enhances the summary with AI.
     """
     try:
-        agent = get_shopping_agent()
+        # First, do a real DB search to get actual stores/products
+        from src.models.store import Product, Store
+        from src.services.geo import haversine_distance
 
-        # Build context for the agent
-        context = {"location": request.location, "search_type": "product_search"}
+        search_results = []
+        user_lat = request.location.get("lat") if request.location else None
+        user_lng = request.location.get("lng") if request.location else None
 
-        # Get AI response from agent
-        response = await agent.search_products(
-            query=request.query, location=request.location
-        )
+        async with async_session() as session:
+            # Real product search
+            search_term = f"%{request.query}%"
+            stmt = (
+                select(Product)
+                .where(Product.name.ilike(search_term))
+                .where(Product.stock > 0)
+                .where(Product.status == "active")
+                .options(selectinload(Product.store))
+            )
+            result = await session.execute(stmt)
+            products = result.scalars().all()
 
-        # For now, return a mock response with the AI-generated summary
-        # In production, this would integrate with actual product/store search
+            # Group by store
+            store_products = {}
+            for p in products:
+                sid = str(p.store_id)
+                if sid not in store_products:
+                    store_products[sid] = {"store": p.store, "products": []}
+                store_products[sid]["products"].append(p)
+
+            # Build results with distance
+            for sid, data in store_products.items():
+                store = data["store"]
+                distance_m = None
+                if user_lat and user_lng:
+                    distance_m = haversine_distance(
+                        user_lat, user_lng, store.latitude, store.longitude
+                    )
+                    if request.radius_km and distance_m > request.radius_km * 1000:
+                        continue
+
+                search_results.append({
+                    "id": str(store.id),
+                    "name": store.name,
+                    "address": store.address,
+                    "distance_m": round(distance_m, 1) if distance_m else None,
+                    "products": [
+                        {
+                            "id": str(p.id),
+                            "name": p.name,
+                            "price": float(p.price) if p.price else None,
+                        }
+                        for p in data["products"]
+                    ],
+                })
+
+            # Sort by distance
+            search_results.sort(key=lambda x: x.get("distance_m") or float("inf"))
+
+        # Try AI enhancement if available
+        summary = ""
+        if search_results:
+            summary = f"Tìm thấy {len(search_results)} cửa hàng có '{request.query}' gần bạn"
+            if search_results[0].get("distance_m") and search_results[0]["distance_m"] < 500:
+                summary += f" • Gần nhất chỉ {search_results[0]['distance_m']}m"
+            summary += ". Nhấn vào cửa hàng để xem chi tiết!"
+        else:
+            summary = f"Không tìm thấy '{request.query}' trong bán kính tìm kiếm. Bạn thử tìm từ khóa khác nhé!"
+
+            # Try AI for suggestions
+            try:
+                agent = get_shopping_agent()
+                ai_response = await agent.search_products(
+                    query=request.query, location=request.location
+                )
+                if ai_response and "chưa sẵn sàng" not in ai_response and "chưa được cấu hình" not in ai_response:
+                    summary = ai_response
+            except Exception:
+                pass  # AI enhancement is optional
+
         return ChatSearchResponse(
-            summary=response,
-            stores=[],  # TODO: Integrate with actual search logic
-            total_found=0,
+            summary=summary,
+            stores=search_results,
+            total_found=len(search_results),
         )
-
     except Exception as e:
         logger.error(f"Chat search error: {e}")
         raise HTTPException(

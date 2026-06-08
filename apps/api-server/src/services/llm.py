@@ -2,6 +2,7 @@
 Ollama Cloud LLM Service for VietStore RAG
 
 Provides interface to Ollama cloud API for LLM inference.
+Uses OpenAI-compatible chat completions API format.
 """
 
 import logging
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class OllamaCloudService:
-    """Service for interacting with Ollama Cloud API."""
+    """Service for interacting with Ollama Cloud API (OpenAI-compatible)."""
 
     def __init__(self):
         """Initialize Ollama Cloud service."""
@@ -46,7 +47,7 @@ class OllamaCloudService:
         **kwargs,
     ) -> str:
         """
-        Generate text using Ollama Cloud API.
+        Generate text using OpenAI-compatible chat completions API.
 
         Args:
             prompt: The input prompt
@@ -59,6 +60,10 @@ class OllamaCloudService:
         Returns:
             Generated text response
         """
+        if not self.api_key:
+            logger.warning("No Ollama Cloud API key configured, LLM service disabled")
+            return "Xin lỗi, dịch vụ AI chưa được cấu hình. Vui lòng liên hệ quản trị viên."
+
         if not HTTPX_AVAILABLE:
             logger.warning("httpx not available, cannot generate text")
             return "Xin lỗi, dịch vụ LLM chưa sẵn sàng."
@@ -76,20 +81,18 @@ class OllamaCloudService:
 
         payload = {
             "model": model,
-            "prompt": prompt,
+            "messages": [
+                {"role": "system", "content": system_prompt or "You are a helpful assistant."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
             "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens,
-            },
         }
 
-        if system_prompt:
-            payload["system"] = system_prompt
-
-        # Add any additional options
+        # Add any additional parameters
         if kwargs:
-            payload["options"].update(kwargs)
+            payload.update(kwargs)
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -101,8 +104,10 @@ class OllamaCloudService:
                 response.raise_for_status()
                 data = response.json()
 
-                # Extract the generated text from response
-                if "message" in data and "content" in data["message"]:
+                # Extract the generated text from response (OpenAI-compatible format)
+                if "choices" in data and len(data["choices"]) > 0:
+                    return data["choices"][0].get("message", {}).get("content", "")
+                elif "message" in data and "content" in data["message"]:
                     return data["message"]["content"]
                 elif "response" in data:
                     return data["response"]
@@ -128,7 +133,7 @@ class OllamaCloudService:
         **kwargs,
     ) -> str:
         """
-        Chat completion using Ollama Cloud API.
+        Chat completion using OpenAI-compatible chat completions API.
 
         Args:
             messages: List of message dicts with 'role' and 'content'
@@ -140,6 +145,10 @@ class OllamaCloudService:
         Returns:
             Generated text response
         """
+        if not self.api_key:
+            logger.warning("No Ollama Cloud API key configured, LLM service disabled")
+            return "Xin lỗi, dịch vụ AI chưa được cấu hình. Vui lòng liên hệ quản trị viên."
+
         if not HTTPX_AVAILABLE:
             logger.warning("httpx not available, cannot generate text")
             return "Xin lỗi, dịch vụ LLM chưa sẵn sàng."
@@ -158,16 +167,14 @@ class OllamaCloudService:
         payload = {
             "model": model,
             "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
             "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens,
-            },
         }
 
-        # Add any additional options
+        # Add any additional parameters
         if kwargs:
-            payload["options"].update(kwargs)
+            payload.update(kwargs)
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -179,8 +186,10 @@ class OllamaCloudService:
                 response.raise_for_status()
                 data = response.json()
 
-                # Extract the generated text from response
-                if "message" in data and "content" in data["message"]:
+                # Extract the generated text from response (OpenAI-compatible format)
+                if "choices" in data and len(data["choices"]) > 0:
+                    return data["choices"][0].get("message", {}).get("content", "")
+                elif "message" in data and "content" in data["message"]:
                     return data["message"]["content"]
                 elif "response" in data:
                     return data["response"]

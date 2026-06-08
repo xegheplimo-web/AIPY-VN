@@ -3,7 +3,7 @@ import { Edit2, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataTable';
-import api from '../services/api';
+import apiService from '../services/api';
 
 interface Product {
   id: string;
@@ -31,17 +31,19 @@ export default function ProductManagementPage() {
 
   useEffect(() => {
     // Try to get store_id from settings or localStorage
-    const savedStoreId = localStorage.getItem('owner_store_id') || '';
+    const savedStoreId = localStorage.getItem('owner_store_id') || localStorage.getItem('store_id') || '';
     setStoreId(savedStoreId);
     if (savedStoreId) {
       loadProducts(savedStoreId);
     }
   }, []);
 
-  const loadProducts = async (sid: string) => {
+  const loadProducts = async (sid?: string) => {
     try {
-      const res: any = await api.get(`/owner/products?store_id=${sid}&limit=100`);
-      setProducts(res.products || res.data?.products || []);
+      const currentStoreId = sid || storeId || localStorage.getItem('owner_store_id') || localStorage.getItem('store_id') || '';
+      if (!currentStoreId) return;
+      const res = await apiService.getProducts({ limit: 100 });
+      setProducts(res.products || []);
     } catch (err) {
       console.error('Failed to load products:', err);
     }
@@ -53,7 +55,7 @@ export default function ProductManagementPage() {
       return;
     }
     try {
-      await api.post(`/owner/products?store_id=${storeId}`, {
+      await apiService.createProduct({
         name: form.name,
         price: parseFloat(form.price),
         stock: parseInt(form.stock),
@@ -82,7 +84,7 @@ export default function ProductManagementPage() {
     if (!storeId) return;
     if (!confirm('Bạn chắc chắn muốn xóa?')) return;
     try {
-      await api.delete(`/owner/products/${id}?store_id=${storeId}`);
+      await apiService.deleteProduct(id);
       loadProducts(storeId);
     } catch (err) {
       alert('Xóa thất bại!');

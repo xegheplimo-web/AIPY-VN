@@ -159,21 +159,59 @@ async def require_auth(request: Request) -> dict:
     """
     Dependency that requires authentication.
 
+    Works both when AuthMiddleware is active (production) and when it's not (development).
+    - If middleware set request.state.user_id, use that directly.
+    - Otherwise, extract and verify the JWT token from Authorization header.
+
     Args:
         request: FastAPI request
 
     Returns:
-        User info dict
+        User info dict with id, role, email
 
     Raises:
         HTTPException if not authenticated
     """
+    # First try: get user info from middleware (production mode)
     user = await get_current_user(request)
-    if not user or not user["id"]:
+    if user and user["id"]:
+        return user
+
+    # Fallback: verify token directly from Authorization header (development mode)
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Provide a valid Bearer token.",
         )
-    return user
+
+    token = auth_header.split(" ")[1]
+    try:
+        jwt_service = get_jwt_service()
+        payload = jwt_service.verify_token(token) or jwt_service.decode_token(token)
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+            )
+
+        # Set on request state for downstream use
+        request.state.user_id = payload.get("sub")
+        request.state.user_role = payload.get("role", "customer")
+        request.state.user_email = payload.get("email")
+
+        return {
+            "id": payload.get("sub"),
+            "role": payload.get("role", "customer"),
+            "email": payload.get("email"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Authentication failed: {e!s}",
+        )
 
 
 async def require_role(role: str, request: Request) -> dict:

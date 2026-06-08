@@ -407,7 +407,7 @@ class ApiService {
   }
 
   async addToCart(productId: string, quantity: number = 1): Promise<{ items: CartItem[] }> {
-    return this.request<{ items: CartItem[] }>('/api/cart', {
+    return this.request<{ items: CartItem[] }>('/api/cart/items', {
       method: 'POST',
       body: JSON.stringify({ product_id: productId, quantity }),
     });
@@ -457,7 +457,7 @@ class ApiService {
   }): Promise<{ orders: Order[]; total: number; page: number; limit: number }> {
     const query = new URLSearchParams(params as any);
     return this.request<{ orders: Order[]; total: number; page: number; limit: number }>(
-      `/api/orders?${query}`
+      `/api/users/me/orders?${query}`
     );
   }
 
@@ -473,7 +473,7 @@ class ApiService {
 
   // User Profile
   async getProfile(): Promise<User> {
-    return this.request<User>('/api/users/me');
+    return this.request<User>('/api/auth/me');
   }
 
   async updateProfile(data: Partial<User>): Promise<User> {
