@@ -1,45 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Phone, MessageCircle, Star, Clock } from 'lucide-react';
+import { ArrowLeft, MapPin, Phone, MessageCircle, Star, Clock, Store, ShoppingCart, Plus } from 'lucide-react';
 import { apiService } from '../services/api';
-
-interface Store {
-  id: string;
-  name: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  phone?: string;
-  email?: string;
-  zalo?: string;
-  logo_url?: string;
-  cover_image_url?: string;
-  business_hours?: Record<string, string>;
-  is_open_now?: boolean;
-  rating?: number;
-  total_reviews?: number;
-  industry?: string;
-  products_count?: number;
-  average_rating?: number;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  price?: number;
-  stock: number;
-  unit: string;
-  images?: string[];
-  shelf_location?: string;
-}
+import type { Store as StoreType, Product } from '../services/api';
 
 export default function StoreDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [store, setStore] = useState<Store | null>(null);
+  const [store, setStore] = useState<StoreType | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addingId, setAddingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) loadStoreDetail(id);
@@ -47,12 +18,13 @@ export default function StoreDetailPage() {
 
   const loadStoreDetail = async (storeId: string) => {
     try {
-      const [storeRes, productsRes] = await Promise.all([
-        apiService.get(`/stores/${storeId}`),
-        apiService.get(`/stores/${storeId}/products?limit=20`),
+      setLoading(true);
+      const [storeData, productsData] = await Promise.all([
+        apiService.getStore(storeId),
+        apiService.getStoreProducts(storeId),
       ]);
-      setStore(storeRes.data);
-      setProducts(productsRes.data.products || []);
+      setStore(storeData);
+      setProducts(productsData);
     } catch (err) {
       console.error('Failed to load store detail:', err);
     } finally {
@@ -61,28 +33,46 @@ export default function StoreDetailPage() {
   };
 
   const addToCart = async (product: Product) => {
+    if (!store) return;
     try {
-      await apiService.post('/cart/items', { product_id: product.id, quantity: 1 });
-      alert('Da them vao gio hang!');
+      setAddingId(product.id);
+      await apiService.addToCart(product.id, 1);
+      alert('Đã thêm vào giỏ hàng!');
     } catch (err) {
-      // Fallback to localStorage
+      console.error('Failed to add to cart:', err);
+      // Fallback localStorage with store_id
       const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-      cart.push({
-        id: `temp-${Date.now()}`,
-        product: { name: product.name, price: product.price, unit: product.unit, images: product.images },
-        quantity: 1,
-        unit_price: product.price || 0,
-        subtotal: product.price || 0,
-      });
+      const existing = cart.find((item: any) => item.product_id === product.id);
+      if (existing) {
+        existing.quantity += 1;
+        existing.subtotal = existing.unit_price * existing.quantity;
+      } else {
+        cart.push({
+          id: `local-${Date.now()}`,
+          product_id: product.id,
+          name: product.name,
+          price: product.price || 0,
+          unit_price: product.price || 0,
+          quantity: 1,
+          stock: product.stock,
+          store_id: store.id,
+          store_name: store.name,
+          images: product.images,
+          unit: 'cái',
+          subtotal: product.price || 0,
+        });
+      }
       localStorage.setItem('cart', JSON.stringify(cart));
-      alert('Da them vao gio hang!');
+      alert('Đã thêm vào giỏ hàng (local)!');
+    } finally {
+      setAddingId(null);
     }
   };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
       </div>
     );
   }
@@ -90,7 +80,7 @@ export default function StoreDetailPage() {
   if (!store) {
     return (
       <div className="max-w-lg mx-auto p-4 text-center">
-        <p className="text-gray-500">Không tim thay cua hang</p>
+        <p className="text-gray-500">Không tìm thấy cửa hàng</p>
         <button onClick={() => navigate('/')} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg">
           Quay lại
         </button>
@@ -117,7 +107,7 @@ export default function StoreDetailPage() {
         </button>
         {store.is_open_now !== undefined && (
           <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-medium ${store.is_open_now ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {store.is_open_now ? 'Dang mo' : 'Da dong'}
+            {store.is_open_now ? 'Đang mở' : 'Đã đóng'}
           </div>
         )}
       </div>
@@ -126,7 +116,7 @@ export default function StoreDetailPage() {
       <div className="p-4 bg-white -mt-6 rounded-t-3xl relative">
         <div className="flex items-start gap-3">
           {store.logo_url && (
-            <img src={store.logo_url} alt="" className="w-16 h-16 rounded-full border-2 border-white shadow -mt-10" />
+            <img src={store.logo_url} alt="" className="w-16 h-16 rounded-full border-2 border-white shadow -mt-10 bg-white" />
           )}
           <div className="flex-1">
             <h1 className="text-xl font-bold">{store.name}</h1>
@@ -137,7 +127,7 @@ export default function StoreDetailPage() {
               <div className="flex items-center gap-1 mt-1">
                 <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                 <span className="font-medium">{store.rating}</span>
-                <span className="text-sm text-gray-400">({store.total_reviews || 0} danh gia)</span>
+                <span className="text-sm text-gray-400">({store.review_count || 0} đánh giá)</span>
               </div>
             )}
           </div>
@@ -147,7 +137,7 @@ export default function StoreDetailPage() {
         <div className="grid grid-cols-3 gap-3 mt-4">
           <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1 p-3 bg-green-50 text-green-700 rounded-xl">
             <MapPin className="w-5 h-5" />
-            <span className="text-sm font-medium">Chi duong</span>
+            <span className="text-sm font-medium">Chỉ đường</span>
           </a>
           <Link to={`/chat?store_id=${store.id}`} className="flex flex-col items-center gap-1 p-3 bg-purple-50 text-purple-700 rounded-xl">
             <MessageCircle className="w-5 h-5" />
@@ -156,7 +146,7 @@ export default function StoreDetailPage() {
           {store.phone && (
             <a href={`tel:${store.phone}`} className="flex flex-col items-center gap-1 p-3 bg-blue-50 text-blue-700 rounded-xl">
               <Phone className="w-5 h-5" />
-              <span className="text-sm font-medium">Goi dien</span>
+              <span className="text-sm font-medium">Gọi điện</span>
             </a>
           )}
         </div>
@@ -166,13 +156,13 @@ export default function StoreDetailPage() {
           <div className="mt-4 p-3 bg-gray-50 rounded-xl">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-gray-500" />
-              <span className="font-medium">Giờ mo cua</span>
+              <span className="font-medium">Giờ mở cửa</span>
             </div>
             <div className="text-sm space-y-1">
               {Object.entries(store.business_hours).map(([day, hours]) => (
                 <div key={day} className="flex justify-between">
                   <span className="capitalize text-gray-500">{day}</span>
-                  <span>{hours}</span>
+                  <span>{hours as string}</span>
                 </div>
               ))}
             </div>
@@ -182,7 +172,9 @@ export default function StoreDetailPage() {
 
       {/* Products */}
       <div className="p-4">
-        <h2 className="text-lg font-bold mb-3">Sản phẩm ({products.length})</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold">Sản phẩm ({products.length})</h2>
+        </div>
         <div className="space-y-3">
           {products.map((product) => (
             <div key={product.id} className="flex gap-3 p-3 bg-white rounded-xl shadow-sm border">
@@ -193,18 +185,19 @@ export default function StoreDetailPage() {
                   <span className="text-2xl">📦</span>
                 )}
               </div>
-              <div className="flex-1">
-                <Link to={`/product/${product.id}`} className="font-medium hover:text-blue-600">
+              <div className="flex-1 min-w-0">
+                <Link to={`/product/${product.id}`} className="font-medium hover:text-blue-600 block truncate">
                   {product.name}
                 </Link>
-                <p className="text-sm text-gray-500">{product.unit}</p>
+                <p className="text-sm text-gray-500">{product.category || 'Sản phẩm'}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-blue-600 font-bold">{product.price?.toLocaleString('vi-VN')}đ</span>
                   <button
                     onClick={() => addToCart(product)}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                    disabled={addingId === product.id || product.stock <= 0}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
                   >
-                    Them
+                    <Plus className="w-3.5 h-3.5" /> Thêm
                   </button>
                 </div>
               </div>

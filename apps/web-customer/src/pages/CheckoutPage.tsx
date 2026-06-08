@@ -1,6 +1,7 @@
 import { ArrowLeft, Check, ChevronRight, CreditCard, MapPin, Package, Truck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { apiService } from '../services/api';
 import { calculateShippingFee, formatShippingFee } from '../utils/shipping';
 
 interface Product {

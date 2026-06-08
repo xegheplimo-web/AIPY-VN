@@ -298,6 +298,23 @@ class ApiService {
     });
   }
 
+  // Generic HTTP methods for backward compatibility
+  async get<T>(endpoint: string, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'GET' });
+  }
+
+  async post<T>(endpoint: string, body?: any, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'POST', body: body ? JSON.stringify(body) : undefined });
+  }
+
+  async put<T>(endpoint: string, body?: any, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'PUT', body: body ? JSON.stringify(body) : undefined });
+  }
+
+  async delete<T>(endpoint: string, options?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+  }
+
   // Auth
   async login(email: string, password: string) {
     const response = await this.request<{
@@ -367,6 +384,21 @@ class ApiService {
 
   async getStoreProducts(storeId: string): Promise<Product[]> {
     return this.request<Product[]>(`/api/stores/${storeId}/products`);
+  }
+
+  async getProductOffers(productId: string, lat?: number, lng?: number): Promise<{
+    offers: Array<{
+      store_id: string;
+      store_name: string;
+      distance_m: number;
+      price: number;
+      stock: number;
+      is_open_now: boolean;
+      map_url: string;
+    }>;
+  }> {
+    const query = lat !== undefined && lng !== undefined ? `?lat=${lat}&lng=${lng}` : '';
+    return this.request(`/api/products/${productId}/offers${query}`);
   }
 
   // Cart
