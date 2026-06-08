@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, BellOff, Check, X } from 'lucide-react';
 import { requestNotificationPermission, onMessageListener } from '../lib/firebase';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 interface NotificationToast {
   id: string;
@@ -26,7 +26,7 @@ export function NotificationManager() {
       
       if (token) {
         // Register token with backend
-        await api.post('/notifications/register', {
+        await apiService.post('/notifications/register', {
           token,
           platform: 'web',
         });

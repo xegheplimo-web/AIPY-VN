@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from src.db import async_session
+from src.database import async_session
 from src.models.store import Store, Product, Category
 
 router = APIRouter(prefix="/api/products", tags=["Products"])
@@ -19,9 +19,7 @@ class StoreInfo(BaseModel):
     phone: Optional[str] = None
     latitude: float
     longitude: float
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class ProductDetailResponse(BaseModel):
@@ -40,9 +38,7 @@ class ProductDetailResponse(BaseModel):
     category_name: Optional[str] = None
     status: Optional[str] = None
     store: StoreInfo
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class AlternativeProductItem(BaseModel):
@@ -51,9 +47,7 @@ class AlternativeProductItem(BaseModel):
     price: Optional[float] = None
     stock: Optional[int] = None
     store_name: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class AlternativesResponse(BaseModel):

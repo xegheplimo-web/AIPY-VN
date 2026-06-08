@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import selectinload
 
-from src.db import async_session
+from src.database import async_session
 from src.models.user import User
 from src.models.store import Store, Product
 from src.middleware.auth_middleware import get_current_user, require_auth
@@ -43,9 +43,7 @@ class ReviewResponse(BaseModel):
     comment: str
     created_at: str
     updated_at: Optional[str]
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class ReviewListResponse(BaseModel):

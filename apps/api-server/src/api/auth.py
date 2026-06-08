@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy import select
 from passlib.context import CryptContext
 
-from src.db import async_session
+from src.database import async_session
 from src.models.user import User, Address
 from src.services.ecc import get_jwt_service, get_ecc_service
 from src.middleware.auth_middleware import get_current_user, require_auth
@@ -97,11 +97,7 @@ class UserResponse(BaseModel):
     role: str
     is_verified: bool
     created_at: str
-
-    class Config:
-        from_attributes = True
-
-
+    model_config = {"from_attributes": True}
 def hash_password(password: str) -> str:
     """Hash password using bcrypt"""
     return pwd_context.hash(password)

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
-from src.db import async_session
+from src.database import async_session
 from src.models.user import User
 from src.services.firebase import get_firebase_service
 from src.middleware.auth_middleware import require_auth

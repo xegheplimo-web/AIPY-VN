@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from src.db import async_session
+from src.database import async_session
 from src.models.store import Store, Product, Category
 from src.models.review import Review
 from src.utils.pagination import paginate, get_pagination_metadata
@@ -29,9 +29,7 @@ class StoreListItem(BaseModel):
     rating: Optional[float] = None
     total_reviews: Optional[int] = None
     status: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class StoreListResponse(BaseModel):
@@ -62,9 +60,7 @@ class StoreDetailResponse(BaseModel):
     location_verified: Optional[bool] = None
     products_count: int
     average_rating: Optional[float] = None
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class StoreProductItem(BaseModel):
@@ -77,9 +73,7 @@ class StoreProductItem(BaseModel):
     images: Optional[List[str]] = None
     shelf_location: Optional[str] = None
     category_name: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class StoreProductsResponse(BaseModel):

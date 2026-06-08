@@ -20,7 +20,7 @@ export default function UserProfilePage() {
 
   const menuItems = [
     { icon: ShoppingBag, label: 'Don hang cua toi', href: '/orders', badge: null },
-    { icon: Heart, label: 'San pham yeu thich', href: '#', badge: null },
+    { icon: Heart, label: 'Sản phẩm yeu thich', href: '#', badge: null },
     { icon: MapPin, label: 'Dia chi giao hang', href: '#', badge: null },
   ];
 
@@ -29,7 +29,7 @@ export default function UserProfilePage() {
     try {
       // TODO: Call API to update profile
       console.log('Updating profile:', data);
-      // await api.put('/users/profile', data);
+      // await apiService.put('/users/profile', data);
       setIsEditing(false);
     } catch (err) {
       alert('Cap nhat that bai, vui long thu lai!');

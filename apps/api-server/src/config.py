@@ -6,7 +6,7 @@ Validates required environment variables and provides configuration access.
 
 import os
 from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -14,10 +14,10 @@ class DatabaseConfig(BaseModel):
     """Database configuration."""
 
     url: str = Field(
-        default="postgresql+asyncpg://username:password@localhost:5432/vietstore"
+        default="postgresql+asyncpg://postgres:postgres@localhost:5432/vietstore"
     )
 
-    @validator("url")
+    @field_validator("url")
     def validate_database_url(cls, v):
         if not v or "username:password" in v:
             raise ValueError(
@@ -47,7 +47,7 @@ class ECCConfig(BaseModel):
 
     private_key_pem: Optional[str] = Field(default=None, alias="ECC_PRIVATE_KEY_PEM")
 
-    @validator("private_key_pem")
+    @field_validator("private_key_pem")
     def validate_ecc_key(cls, v):
         if v and not v.startswith("-----BEGIN"):
             raise ValueError("ECC_PRIVATE_KEY_PEM must be a valid PEM format")
@@ -66,7 +66,7 @@ class OllamaConfig(BaseModel):
     )
     timeout: int = Field(default=30, alias="OLLAMA_TIMEOUT")
 
-    @validator("cloud_api_key")
+    @field_validator("cloud_api_key")
     def validate_api_key(cls, v):
         if v and not v.startswith("sk-"):
             raise ValueError("OLLAMA_CLOUD_API_KEY must start with 'sk-'")
@@ -216,12 +216,9 @@ class AppConfig(BaseSettings):
     # CSRF
     csrf_secret_key: str = Field(default="", alias="CSRF_SECRET_KEY")
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        extra = "allow"  # Allow extra fields like LOG_LEVEL
+    model_config = {"env_file": ".env", "case_sensitive": False, "extra": "allow"}
 
-    @validator("environment")
+    @field_validator("environment")
     def validate_environment(cls, v):
         allowed = ["development", "staging", "production"]
         if v not in allowed:

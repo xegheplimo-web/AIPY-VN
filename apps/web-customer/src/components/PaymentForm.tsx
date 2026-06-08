@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CreditCard, Lock, Check, AlertCircle } from 'lucide-react';
 import { createPaymentIntent, confirmPayment, stripePromise } from '../lib/stripe';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 interface PaymentFormProps {
   amount: number;

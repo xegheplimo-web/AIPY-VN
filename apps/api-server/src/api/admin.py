@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, func
 
-from src.db import async_session
+from src.database import async_session
 from src.models.store import Store, Product, Category
 from src.models.user import User
 from src.models.order import Order

@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Text, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-from src.db import Base
+from src.database import Base
 
 
 class Message(Base):

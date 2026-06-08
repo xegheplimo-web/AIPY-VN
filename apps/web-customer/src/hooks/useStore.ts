@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 export interface Store {
   id: string;
@@ -44,7 +44,7 @@ export function useStore(storeId?: string) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/api/stores/${id}`);
+      const res = await apiService.get(`/api/stores/${id}`);
       setStore(res.data);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Không thể tải thông tin cửa hàng');

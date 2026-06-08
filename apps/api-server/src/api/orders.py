@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from src.db import async_session
+from src.database import async_session
 from src.models.store import Product
 from src.models.order import Cart, CartItem, Order, OrderItem
 from src.services.ecc import get_request_signer, get_ecc_service
@@ -52,9 +52,7 @@ class OrderItemResponse(BaseModel):
     quantity: int
     unit_price: float
     subtotal: float
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class OrderResponse(BaseModel):
@@ -72,9 +70,7 @@ class OrderResponse(BaseModel):
     status: str
     items: List[OrderItemResponse]
     created_at: str
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class OrderListResponse(BaseModel):

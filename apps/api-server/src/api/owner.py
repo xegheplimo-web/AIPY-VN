@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, delete
 
-from src.db import async_session
+from src.database import async_session
 from src.models.store import Product, Store, Category
 
 router = APIRouter(prefix="/api/owner", tags=["Owner"])
@@ -25,9 +25,7 @@ class OwnerProductItem(BaseModel):
     shelf_location: Optional[str] = None
     status: str
     created_at: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class OwnerProductListResponse(BaseModel):

@@ -7,7 +7,7 @@ import re
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from src.db import async_session
+from src.database import async_session
 from src.models.store import Store, Product
 from src.services.geo import haversine_distance
 

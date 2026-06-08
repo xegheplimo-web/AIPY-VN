@@ -76,7 +76,7 @@ function StoreCard({ store }: { store: typeof sampleStores[0] }) {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12 border-2 border-primary/10">
-              <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${store.name}`} />
+              <AvatarImage src={`https://apiService.dicebear.com/7.x/initials/svg?seed=${store.name}`} />
               <AvatarFallback className="bg-primary/10 text-primary text-sm">
                 {store.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
               </AvatarFallback>
@@ -124,7 +124,7 @@ function StoreCard({ store }: { store: typeof sampleStores[0] }) {
               <div className="text-right">
                 <p className="text-sm font-bold text-primary">{p.price.toLocaleString('vi-VN')}d</p>
                 <Badge variant={p.stock > 0 ? 'default' : 'destructive'} className="text-xs">
-                  {p.stock > 0 ? `Con ${p.stock}` : 'Het hang'}
+                  {p.stock > 0 ? `Con ${p.stock}` : 'Hết hàng'}
                 </Badge>
               </div>
             </div>
@@ -242,7 +242,7 @@ export default function DemoPage() {
           <Card className="text-center py-3">
             <CardContent className="p-0">
               <p className="text-2xl font-bold text-emerald-500">5</p>
-              <p className="text-xs text-gray-500">San pham</p>
+              <p className="text-xs text-gray-500">Sản phẩm</p>
             </CardContent>
           </Card>
           <Card className="text-center py-3">
@@ -257,7 +257,7 @@ export default function DemoPage() {
         <Tabs defaultValue="stores" className="mb-4">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="stores">Cua hang</TabsTrigger>
-            <TabsTrigger value="products">San pham</TabsTrigger>
+            <TabsTrigger value="products">Sản phẩm</TabsTrigger>
             <TabsTrigger value="map">Ban do</TabsTrigger>
           </TabsList>
 

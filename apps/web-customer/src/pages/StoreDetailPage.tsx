@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Phone, MessageCircle, Star, Clock } from 'lucide-react';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 interface Store {
   id: string;
@@ -48,8 +48,8 @@ export default function StoreDetailPage() {
   const loadStoreDetail = async (storeId: string) => {
     try {
       const [storeRes, productsRes] = await Promise.all([
-        api.get(`/stores/${storeId}`),
-        api.get(`/stores/${storeId}/products?limit=20`),
+        apiService.get(`/stores/${storeId}`),
+        apiService.get(`/stores/${storeId}/products?limit=20`),
       ]);
       setStore(storeRes.data);
       setProducts(productsRes.data.products || []);
@@ -62,7 +62,7 @@ export default function StoreDetailPage() {
 
   const addToCart = async (product: Product) => {
     try {
-      await api.post('/cart/items', { product_id: product.id, quantity: 1 });
+      await apiService.post('/cart/items', { product_id: product.id, quantity: 1 });
       alert('Da them vao gio hang!');
     } catch (err) {
       // Fallback to localStorage
@@ -90,9 +90,9 @@ export default function StoreDetailPage() {
   if (!store) {
     return (
       <div className="max-w-lg mx-auto p-4 text-center">
-        <p className="text-gray-500">Khong tim thay cua hang</p>
+        <p className="text-gray-500">Không tim thay cua hang</p>
         <button onClick={() => navigate('/')} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg">
-          Quay lai
+          Quay lại
         </button>
       </div>
     );
@@ -166,7 +166,7 @@ export default function StoreDetailPage() {
           <div className="mt-4 p-3 bg-gray-50 rounded-xl">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-gray-500" />
-              <span className="font-medium">Gio mo cua</span>
+              <span className="font-medium">Giờ mo cua</span>
             </div>
             <div className="text-sm space-y-1">
               {Object.entries(store.business_hours).map(([day, hours]) => (
@@ -182,7 +182,7 @@ export default function StoreDetailPage() {
 
       {/* Products */}
       <div className="p-4">
-        <h2 className="text-lg font-bold mb-3">San pham ({products.length})</h2>
+        <h2 className="text-lg font-bold mb-3">Sản phẩm ({products.length})</h2>
         <div className="space-y-3">
           {products.map((product) => (
             <div key={product.id} className="flex gap-3 p-3 bg-white rounded-xl shadow-sm border">

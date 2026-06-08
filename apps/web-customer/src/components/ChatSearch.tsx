@@ -185,15 +185,6 @@ export default function ChatSearch({ onResultSelect }: ChatSearchProps) {
 
       <div className="p-4 bg-white border-t">
         <div className="flex gap-2">
-          <VoiceSearch
-            onTranscript={(text) => {
-              setInput(text);
-              handleSend();
-            }}
-            onError={(error) => {
-              setMessages((prev) => [...prev, { role: 'bot', content: `❌ ${error}` }]);
-            }}
-          />
           <input
             type="text"
             value={input}

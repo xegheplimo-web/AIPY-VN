@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart, Share2, Store } from 'lucide-react';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 interface Product {
   id: string;
@@ -49,8 +49,8 @@ export default function ProductDetailPage() {
   const loadProduct = async (productId: string) => {
     try {
       const [productRes, altRes] = await Promise.all([
-        api.get(`/products/${productId}`),
-        api.get(`/products/${productId}/alternatives?limit=5`),
+        apiService.get(`/products/${productId}`),
+        apiService.get(`/products/${productId}/alternatives?limit=5`),
       ]);
       setProduct(productRes.data);
       setAlternatives(altRes.data.alternatives || []);
@@ -64,7 +64,7 @@ export default function ProductDetailPage() {
   const addToCart = async () => {
     if (!product) return;
     try {
-      await api.post('/cart/items', { product_id: product.id, quantity });
+      await apiService.post('/cart/items', { product_id: product.id, quantity });
       alert('Da them vao gio hang!');
     } catch (err) {
       const cart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -91,9 +91,9 @@ export default function ProductDetailPage() {
   if (!product) {
     return (
       <div className="max-w-lg mx-auto p-4 text-center">
-        <p className="text-gray-500">Khong tim thay san pham</p>
+        <p className="text-gray-500">Không tim thay san pham</p>
         <button onClick={() => navigate('/')} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg">
-          Quay lai
+          Quay lại
         </button>
       </div>
     );
@@ -138,7 +138,7 @@ export default function ProductDetailPage() {
 
         {product.stock !== undefined && (
           <p className={`mt-2 text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
-            {product.stock > 0 ? `Con hang: ${product.stock}` : 'Het hang'}
+            {product.stock > 0 ? `Còn hàng: ${product.stock}` : 'Hết hàng'}
           </p>
         )}
 
@@ -191,7 +191,7 @@ export default function ProductDetailPage() {
         {/* Alternatives */}
         {alternatives.length > 0 && (
           <div className="mt-6">
-            <h3 className="font-semibold mb-3">San pham tuong tu</h3>
+            <h3 className="font-semibold mb-3">Sản phẩm tuong tu</h3>
             <div className="space-y-2">
               {alternatives.map((alt) => (
                 <Link
@@ -218,7 +218,7 @@ export default function ProductDetailPage() {
             onClick={addToCart}
             className="flex-1 py-3 bg-blue-100 text-blue-700 rounded-xl font-medium hover:bg-blue-200 flex items-center justify-center gap-2"
           >
-            <ShoppingCart className="w-5 h-5" /> Them vao gio
+            <ShoppingCart className="w-5 h-5" /> Thêm vào gio
           </button>
           <button
             onClick={addToCart}

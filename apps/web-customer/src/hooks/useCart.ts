@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 export interface CartItem {
   id: string;
@@ -47,7 +47,7 @@ export function useCart() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/api/cart/');
+      const res = await apiService.get('/api/cart/');
       const fetchedItems: CartItem[] = res.data.items || [];
       setItems(fetchedItems);
       setLocalCart(fetchedItems);
@@ -72,7 +72,7 @@ export function useCart() {
 
   const addItem = useCallback(async (productId: string, quantity = 1) => {
     try {
-      const res = await api.post('/api/cart/items', { product_id: productId, quantity });
+      const res = await apiService.post('/api/cart/items', { product_id: productId, quantity });
       const updated: CartItem[] = res.data.items || [];
       setItems(updated);
       setLocalCart(updated);
@@ -117,7 +117,7 @@ export function useCart() {
   const updateQuantity = useCallback(async (itemId: string, quantity: number) => {
     if (quantity < 1) return removeItem(itemId);
     try {
-      const res = await api.put(`/api/cart/items/${itemId}`, { quantity });
+      const res = await apiService.put(`/api/cart/items/${itemId}`, { quantity });
       const updated: CartItem[] = res.data.items || [];
       setItems(updated);
       setLocalCart(updated);
@@ -133,7 +133,7 @@ export function useCart() {
 
   const removeItem = useCallback(async (itemId: string) => {
     try {
-      const res = await api.delete(`/api/cart/items/${itemId}`);
+      const res = await apiService.delete(`/api/cart/items/${itemId}`);
       const updated: CartItem[] = res.data.items || [];
       setItems(updated);
       setLocalCart(updated);

@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
 
-from src.db import Base
+from src.database import Base
 
 
 class Store(Base):

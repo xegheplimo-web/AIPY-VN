@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from src.db import async_session
+from src.database import async_session
 from src.models.chat import Message
 from src.models.store import Store
 from src.models.user import User
@@ -39,9 +39,7 @@ class MessageItem(BaseModel):
     message_type: str
     is_read: bool
     created_at: str
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class MessagesResponse(BaseModel):

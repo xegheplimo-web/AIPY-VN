@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy import select, and_
 
-from src.db import async_session
+from src.database import async_session
 from src.models.user import User, Address
 from src.middleware.auth_middleware import get_current_user, require_auth
 
@@ -41,9 +41,7 @@ class ProfileResponse(BaseModel):
     is_active: bool
     created_at: str
     updated_at: Optional[str]
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class AddressRequest(BaseModel):
@@ -78,11 +76,7 @@ class AddressResponse(BaseModel):
     longitude: Optional[float]
     created_at: str
     updated_at: Optional[str]
-
-    class Config:
-        from_attributes = True
-
-
+    model_config = {"from_attributes": True}
 @router.get("/profile", response_model=ProfileResponse)
 async def get_profile(current_user: User = Depends(require_auth)):
     """Get current user's profile information."""

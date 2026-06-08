@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, FormCheckbox, FormField, FormSelect } from '../components/forms';
 import { checkoutSchema, type CheckoutFormData } from '../lib/validations';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 interface CartItem {
-  product: { name: string; price: number; unit: string };
+  product: { id: string; name: string; price: number; unit: string; store_id?: string };
   quantity: number;
   unit_price: number;
   subtotal: number;
@@ -37,25 +37,20 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
-      const res = await api.post('/orders', {
+      const res = await apiService.createOrder({
+        store_id: cartItems[0]?.product?.store_id || 'default-store',
         items: cartItems.map((item) => ({
-          product_id: item.product.name,
+          product_id: item.product.id,
           quantity: item.quantity,
           unit_price: item.unit_price,
         })),
-        store_id: 'store-1',
-        delivery_method: data.deliveryMethod,
-        delivery_address: data.deliveryMethod === 'delivery' ? data.address : null,
-        subtotal,
-        shipping_fee: shippingFee,
-        total_amount: total,
-        payment_method: data.paymentMethod,
-        notes: data.notes,
+        delivery_method: data.deliveryMethod === 'delivery' ? 'delivery' : 'pickup',
+        shipping_address: data.deliveryMethod === 'delivery' ? data.address : undefined,
       });
       localStorage.removeItem('cart');
       navigate('/orders');
     } catch (err) {
-      alert('Dat hang that bai, vui long thu lai!');
+      alert('Đặt hàng thất bại, vui lòng thử lại!');
     } finally {
       setLoading(false);
     }
@@ -78,7 +73,7 @@ export default function CheckoutPage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-xl font-bold">Thanh toan</h1>
+          <h1 className="text-xl font-bold">Thanh toán</h1>
         </div>
         <PaymentForm
           amount={total}
@@ -102,7 +97,7 @@ export default function CheckoutPage() {
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-xl font-bold">Thanh toan</h1>
+        <h1 className="text-xl font-bold">Thanh toán</h1>
       </div>
 
       <Form
@@ -113,7 +108,7 @@ export default function CheckoutPage() {
       >
         {/* Order Items */}
         <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold mb-3">San pham ({cartItems.length})</h2>
+          <h2 className="font-semibold mb-3">Sản phẩm ({cartItems.length})</h2>
           {cartItems.map((item, idx) => (
             <div key={idx} className="flex justify-between py-2 border-b last:border-0">
               <div>
@@ -128,13 +123,13 @@ export default function CheckoutPage() {
         {/* Shipping Information */}
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <h2 className="font-semibold mb-3 flex items-center gap-2">
-            <MapPin className="w-5 h-5" /> Thong tin giao hang
+            <MapPin className="w-5 h-5" /> Thông tin giao hàng
           </h2>
           <div className="space-y-4">
-            <FormField name="fullName" label="Ho ten" placeholder="Nhap ho ten cua ban" required />
+            <FormField name="fullName" label="Họ tên" placeholder="Nhập họ tên của bạn" required />
             <FormField
               name="phone"
-              label="So dien thoai"
+              label="Số điện thoại"
               type="tel"
               placeholder="0xxxxxxxxx"
               required
@@ -142,30 +137,29 @@ export default function CheckoutPage() {
             <FormField name="email" label="Email" type="email" placeholder="email@example.com" />
             <FormField
               name="address"
-              label="Dia chi"
-              placeholder="Nhap dia chi giao hang"
+              label="Địa chỉ"
+              placeholder="Nhập địa chỉ giao hàng"
               required
             />
             <div className="grid grid-cols-2 gap-4">
-              <FormField name="city" label="Thanh pho" placeholder="TP Ho Chi Minh" required />
-              <FormField name="district" label="Quan/Huyen" placeholder="Quan 1" required />
+              <FormField name="city" label="Thành phố" placeholder="TP Hồ Chí Minh" required />
+              <FormField name="district" label="Quận/Huyện" placeholder="Quận 1" required />
             </div>
-            <FormField name="ward" label="Phuong/Xa" placeholder="Phuong Ben Nghe" required />
+            <FormField name="ward" label="Phường/Xã" placeholder="Phường Bến Nghé" required />
           </div>
         </div>
 
         {/* Delivery Method */}
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <h2 className="font-semibold mb-3 flex items-center gap-2">
-            <Truck className="w-5 h-5" /> Phuong thuc giao hang
+            <Truck className="w-5 h-5" /> Phương thức giao hàng
           </h2>
           <FormSelect
             name="deliveryMethod"
-            label="Chon phuong thuc giao hang"
+            label="Chọn phương thức giao hàng"
             options={[
-              { value: 'standard', label: 'Giao hang tieu chuan (2-3 ngay)' },
-              { value: 'express', label: 'Giao hang nhanh (1-2 ngay)' },
-              { value: 'same-day', label: 'Giao hang trong ngay' },
+              { value: 'pickup', label: 'Nhận tại cửa hàng' },
+              { value: 'delivery', label: 'Giao tận nơi' },
             ]}
             required
           />
@@ -174,16 +168,16 @@ export default function CheckoutPage() {
         {/* Payment Method */}
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <h2 className="font-semibold mb-3 flex items-center gap-2">
-            <CreditCard className="w-5 h-5" /> Phuong thuc thanh toan
+            <CreditCard className="w-5 h-5" /> Phương thức thanh toán
           </h2>
           <FormSelect
             name="paymentMethod"
-            label="Chon phuong thuc thanh toan"
+            label="Chọn phương thức thanh toán"
             options={[
-              { value: 'cod', label: 'Thanh toan khi nhan hang (COD)' },
-              { value: 'momo', label: 'Vi Momo' },
+              { value: 'cod', label: 'Thanh toán khi nhận hàng (COD)' },
+              { value: 'momo', label: 'Ví Momo' },
               { value: 'zalopay', label: 'ZaloPay' },
-              { value: 'credit_card', label: 'The tin dung/Ghi nhan' },
+              { value: 'credit_card', label: 'Thẻ tín dụng/Ghi nợ' },
             ]}
             required
           />
@@ -193,8 +187,8 @@ export default function CheckoutPage() {
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <FormField
             name="notes"
-            label="Ghi chu (tuy chon)"
-            placeholder="Them ghi chu cho don hang..."
+            label="Ghi chú (tùy chọn)"
+            placeholder="Thêm ghi chú cho đơn hàng..."
           />
         </div>
 
@@ -202,28 +196,28 @@ export default function CheckoutPage() {
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <FormCheckbox
             name="agreeToTerms"
-            label="Toi dong y voi dieu khoan va dieu kien cua VietStore"
+            label="Tôi đồng ý với điều khoản và điều kiện của AI-SHOP.VN"
             required
           />
         </div>
 
         {/* Summary */}
         <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold mb-3">Tong ket</h2>
+          <h2 className="font-semibold mb-3">Tổng kết</h2>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Tam tinh</span>
+              <span>Tạm tính</span>
               <span>{subtotal.toLocaleString('vi-VN')}đ</span>
             </div>
             <div className="flex justify-between">
-              <span>Phi giao hang</span>
+              <span>Phí giao hàng</span>
               <span>
-                {shippingFee === 0 ? 'Mien phi' : `${shippingFee.toLocaleString('vi-VN')}đ`}
+                {shippingFee === 0 ? 'Miễn phí' : `${shippingFee.toLocaleString('vi-VN')}đ`}
               </span>
             </div>
             <hr />
             <div className="flex justify-between text-lg font-bold">
-              <span>Tong cong</span>
+              <span>Tổng cộng</span>
               <span className="text-blue-600">{total.toLocaleString('vi-VN')}đ</span>
             </div>
           </div>
@@ -233,11 +227,26 @@ export default function CheckoutPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 disabled:opacity-50"
+          className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
-          {loading ? 'Dang xu ly...' : `Dat hang (${total.toLocaleString('vi-VN')}đ)`}
+          {loading ? 'Đang xử lý...' : 'Đặt hàng'}
         </button>
       </Form>
+    </div>
+  );
+}
+
+// Temporary placeholder for PaymentForm component
+function PaymentForm({ amount, orderId, onSuccess, onError }: any) {
+  return (
+    <div className="bg-white rounded-xl p-6 shadow-sm">
+      <p className="text-center text-gray-500">Form thanh toán sẽ được thêm sau</p>
+      <button
+        onClick={onSuccess}
+        className="w-full mt-4 py-3 bg-green-600 text-white rounded-lg font-semibold"
+      >
+        Mô phỏng thanh toán thành công
+      </button>
     </div>
   );
 }

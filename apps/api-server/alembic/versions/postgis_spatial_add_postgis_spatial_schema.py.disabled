@@ -5,29 +5,32 @@ Revises: b8f3d2e1c4a5
 Create Date: 2026-06-08
 
 """
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
-revision = 'postgis_spatial'
-down_revision = 'b8f3d2e1c4a5'
+revision = "postgis_spatial"
+down_revision = "b8f3d2e1c4a5"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
     """Upgrade: Create PostGIS spatial schema for Vietnam geo data."""
-    
+
     # Enable PostGIS extensions
     op.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
     op.execute(text("CREATE EXTENSION IF NOT EXISTS postgis_topology"))
     op.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
     op.execute(text("CREATE EXTENSION IF NOT EXISTS unaccent"))
     op.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
-    
+
     # Create admin tables
-    op.execute(text("""
+    op.execute(
+        text(
+            """
         CREATE TABLE IF NOT EXISTS provinces (
             code INTEGER PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
@@ -39,9 +42,13 @@ def upgrade():
             center GEOMETRY(Point, 4326),
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE TABLE IF NOT EXISTS districts (
             code INTEGER PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
@@ -54,9 +61,13 @@ def upgrade():
             center GEOMETRY(Point, 4326),
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE TABLE IF NOT EXISTS wards (
             code INTEGER PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
@@ -69,10 +80,14 @@ def upgrade():
             center GEOMETRY(Point, 4326),
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
-    """))
-    
+    """
+        )
+    )
+
     # Create store-related tables
-    op.execute(text("""
+    op.execute(
+        text(
+            """
         CREATE TABLE IF NOT EXISTS store_categories (
             id SERIAL PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
@@ -84,9 +99,13 @@ def upgrade():
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE TABLE IF NOT EXISTS brands (
             id SERIAL PRIMARY KEY,
             name VARCHAR(200) NOT NULL,
@@ -101,9 +120,13 @@ def upgrade():
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE TABLE IF NOT EXISTS stores (
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(300) NOT NULL,
@@ -136,10 +159,14 @@ def upgrade():
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )
-    """))
-    
+    """
+        )
+    )
+
     # Create Vietnamese search functions
-    op.execute(text("""
+    op.execute(
+        text(
+            """
         CREATE OR REPLACE FUNCTION vn_unaccent(text)
         RETURNS text AS $$
             SELECT translate(
@@ -148,17 +175,25 @@ def upgrade():
                 'dD'
             );
         $$ LANGUAGE sql IMMUTABLE
-    """))
-    
+    """
+        )
+    )
+
     # Add search columns
-    op.execute(text("""
+    op.execute(
+        text(
+            """
         ALTER TABLE stores 
         ADD COLUMN IF NOT EXISTS search_text TSVECTOR,
         ADD COLUMN IF NOT EXISTS name_normalized VARCHAR(300)
-    """))
-    
+    """
+        )
+    )
+
     # Create search trigger
-    op.execute(text("""
+    op.execute(
+        text(
+            """
         CREATE OR REPLACE FUNCTION stores_search_trigger()
         RETURNS trigger AS $$
         BEGIN
@@ -173,72 +208,128 @@ def upgrade():
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE TRIGGER trg_stores_search
             BEFORE INSERT OR UPDATE ON stores
             FOR EACH ROW
             EXECUTE FUNCTION stores_search_trigger()
-    """))
-    
+    """
+        )
+    )
+
     # Create indexes
-    op.execute(text("""
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_location 
         ON stores USING GIST (location)
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_search_text 
         ON stores USING GIN (search_text)
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_name_trgm 
         ON stores USING GIN (name_normalized gin_trgm_ops)
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_category 
         ON stores (category_id) WHERE is_active = TRUE
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_brand 
         ON stores (brand_id) WHERE is_active = TRUE
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_province ON stores (province_code)
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_district ON stores (district_code)
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_ward ON stores (ward_code)
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_stores_rating 
         ON stores (rating DESC) WHERE is_active = TRUE
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_provinces_geom ON provinces USING GIST (geom)
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_districts_geom ON districts USING GIST (geom)
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE INDEX IF NOT EXISTS idx_wards_geom ON wards USING GIST (geom)
-    """))
-    
+    """
+        )
+    )
+
     # Create stored procedures
-    op.execute(text("""
+    op.execute(
+        text(
+            """
         CREATE OR REPLACE FUNCTION find_nearest_stores(
             p_lat DOUBLE PRECISION,
             p_lng DOUBLE PRECISION,
@@ -307,9 +398,13 @@ def upgrade():
             ORDER BY distance_meters
             LIMIT p_limit;
         $$
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE OR REPLACE FUNCTION search_stores(
             p_query TEXT,
             p_lat DOUBLE PRECISION DEFAULT NULL,
@@ -375,9 +470,13 @@ def upgrade():
             ORDER BY relevance DESC, s.rating DESC
             LIMIT p_limit;
         $$
-    """))
-    
-    op.execute(text("""
+    """
+        )
+    )
+
+    op.execute(
+        text(
+            """
         CREATE OR REPLACE FUNCTION geocode_address(
             p_query TEXT
         )
@@ -416,10 +515,14 @@ def upgrade():
             ) DESC
             LIMIT 5;
         $$
-    """))
-    
+    """
+        )
+    )
+
     # Create view
-    op.execute(text("""
+    op.execute(
+        text(
+            """
         CREATE OR REPLACE VIEW v_stores_full AS
         SELECT 
             s.id,
@@ -445,20 +548,22 @@ def upgrade():
         LEFT JOIN districts d ON s.district_code = d.code
         LEFT JOIN provinces p ON s.province_code = p.code
         WHERE s.is_active = TRUE
-    """))
+    """
+        )
+    )
 
 
 def downgrade():
     """Downgrade: Remove PostGIS spatial schema."""
-    
+
     # Drop view
     op.execute(text("DROP VIEW IF EXISTS v_stores_full"))
-    
+
     # Drop stored procedures
     op.execute(text("DROP FUNCTION IF EXISTS geocode_address"))
     op.execute(text("DROP FUNCTION IF EXISTS search_stores"))
     op.execute(text("DROP FUNCTION IF EXISTS find_nearest_stores"))
-    
+
     # Drop indexes
     op.execute(text("DROP INDEX IF EXISTS idx_wards_geom"))
     op.execute(text("DROP INDEX IF EXISTS idx_districts_geom"))
@@ -472,15 +577,15 @@ def downgrade():
     op.execute(text("DROP INDEX IF EXISTS idx_stores_name_trgm"))
     op.execute(text("DROP INDEX IF EXISTS idx_stores_search_text"))
     op.execute(text("DROP INDEX IF EXISTS idx_stores_location"))
-    
+
     # Drop trigger and function
     op.execute(text("DROP TRIGGER IF EXISTS trg_stores_search ON stores"))
     op.execute(text("DROP FUNCTION IF EXISTS stores_search_trigger"))
-    
+
     # Drop columns
     op.execute(text("ALTER TABLE stores DROP COLUMN IF EXISTS name_normalized"))
     op.execute(text("ALTER TABLE stores DROP COLUMN IF EXISTS search_text"))
-    
+
     # Drop tables
     op.execute(text("DROP TABLE IF EXISTS stores"))
     op.execute(text("DROP TABLE IF EXISTS brands"))
@@ -488,10 +593,10 @@ def downgrade():
     op.execute(text("DROP TABLE IF EXISTS wards"))
     op.execute(text("DROP TABLE IF EXISTS districts"))
     op.execute(text("DROP TABLE IF EXISTS provinces"))
-    
+
     # Drop functions
-    op.execute(text("DROP FUNCTION IF EXISTS vn_unaccent")
-    
+    op.execute(text("DROP FUNCTION IF EXISTS vn_unaccent"))
+
     # Drop extensions
     op.execute(text("DROP EXTENSION IF EXISTS btree_gist"))
     op.execute(text("DROP EXTENSION IF EXISTS unaccent"))

@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import select, and_
 
-from src.db import async_session
+from src.database import async_session
 from src.models.store import Category
 from src.middleware.auth_middleware import require_auth, require_admin
 from src.models.user import User
@@ -41,11 +41,7 @@ class CategoryResponse(BaseModel):
     is_active: bool
     created_at: str
     updated_at: Optional[str]
-
-    class Config:
-        from_attributes = True
-
-
+    model_config = {"from_attributes": True}
 @router.get("", response_model=List[CategoryResponse])
 async def get_categories(
     skip: int = 0,

@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from src.db import async_session
+from src.database import async_session
 from src.models.user import User
 from src.models.store import Product
 from src.middleware.auth_middleware import require_auth
@@ -32,11 +32,7 @@ class FavoriteResponse(BaseModel):
     store_id: str
     store_name: str
     created_at: str
-
-    class Config:
-        from_attributes = True
-
-
+    model_config = {"from_attributes": True}
 @router.get("", response_model=List[FavoriteResponse])
 async def get_favorites(current_user: User = Depends(require_auth)):
     """

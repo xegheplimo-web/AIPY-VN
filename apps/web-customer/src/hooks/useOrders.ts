@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 
@@ -50,7 +50,7 @@ export function useOrders() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/api/users/me/orders');
+      const res = await apiService.get('/api/users/me/orders');
       setOrders(res.data.orders || []);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Không thể tải đơn hàng');

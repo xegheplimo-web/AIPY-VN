@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Clock, CheckCircle, Truck, Home } from 'lucide-react';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 interface OrderItem {
   id: string;
@@ -56,7 +56,7 @@ export default function OrderTrackingPage() {
 
   const loadOrders = async () => {
     try {
-      const res = await api.get('/users/me/orders?limit=50');
+      const res = await apiService.get('/users/me/orders?limit=50');
       setOrders(res.data.orders || []);
     } catch (err) {
       console.error('Failed to load orders:', err);

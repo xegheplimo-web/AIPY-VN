@@ -29,7 +29,7 @@ from src.api.favorites import router as favorites
 from src.api.store_locator import router as store_locator
 from src.api.geo import router as geo
 
-# from src.db import init_db  # Using Alembic migrations instead
+# from src.database import init_db  # Using Alembic migrations instead
 from src.middleware import (
     LoggingMiddleware,
     setup_error_handlers,
@@ -231,7 +231,7 @@ async def health_check():
     from src.vector_db import vector_db
     from src.config import config
     from sqlalchemy import text
-    from src.db import async_session
+    from src.database import async_session
 
     health_status = {
         "status": "ok",

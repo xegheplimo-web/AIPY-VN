@@ -1,9 +1,10 @@
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
 import { lazy, Suspense } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import CustomerLayout from './components/layout/CustomerLayout';
 
 const Home = lazy(() => import('./pages/Home'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'));
@@ -22,53 +23,25 @@ function LoadingFallback() {
   );
 }
 
-function Header() {
-  return (
-    <header className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <h1 className="text-xl font-bold text-blue-600">VietStore</h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700">
-                  Sign In
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                  Sign Up
-                </button>
-              </SignUpButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton afterSignOutUrl="/" />
-            </SignedIn>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
-
 export default function App() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/store/:id" element={<StoreDetailPage />} />
-          <Route path="/product/:id" element={<ProductDetailPage />} />
-          <Route path="/orders" element={<OrderTrackingPage />} />
-          <Route path="/profile" element={<UserProfilePage />} />
-          <Route path="/demo" element={<DemoPage />} />
-          <Route path="/design" element={<DesignPage />} />
-          <Route path="/locator" element={<StoreLocatorPage />} />
+          <Route path="/" element={<CustomerLayout />}>
+            <Route index element={<Home />} />
+            <Route path="search" element={<SearchPage />} />
+            <Route path="cart" element={<CartPage />} />
+            <Route path="checkout" element={<CheckoutPage />} />
+            <Route path="store/:id" element={<StoreDetailPage />} />
+            <Route path="product/:id" element={<ProductDetailPage />} />
+            <Route path="orders" element={<OrderTrackingPage />} />
+            <Route path="profile" element={<UserProfilePage />} />
+            <Route path="demo" element={<DemoPage />} />
+            <Route path="design" element={<DesignPage />} />
+            <Route path="locator" element={<StoreLocatorPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster position="top-right" richColors />
       </Suspense>

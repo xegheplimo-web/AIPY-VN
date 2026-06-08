@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, delete, update
 from sqlalchemy.orm import selectinload
 
-from src.db import async_session
+from src.database import async_session
 from src.models.store import Product
 from src.models.order import Cart, CartItem
 
@@ -20,9 +20,7 @@ class CartProductInfo(BaseModel):
     stock: int
     unit: str
     images: Optional[List[str]] = None
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class CartItemResponse(BaseModel):
@@ -31,9 +29,7 @@ class CartItemResponse(BaseModel):
     quantity: int
     unit_price: float
     subtotal: float
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class CartResponse(BaseModel):

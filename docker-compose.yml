@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgis/postgis:16-3.4-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -48,7 +46,7 @@ services:
     ports: ["6333:6333"]
     volumes: ["qdrant:/qdrant/storage"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6333/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/readyz"]
       interval: 30s
       timeout: 10s
       retries: 3

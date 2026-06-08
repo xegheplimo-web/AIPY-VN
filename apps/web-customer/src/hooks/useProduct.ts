@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
+import { apiService } from '../services/api';
 
 export interface Product {
   id: string;
@@ -42,7 +42,7 @@ export function useProduct(productId?: string) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/api/products/${id}`);
+      const res = await apiService.get(`/api/products/${id}`);
       setProduct(res.data);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Không thể tải thông tin sản phẩm');
@@ -54,7 +54,7 @@ export function useProduct(productId?: string) {
 
   const fetchAlternatives = useCallback(async (id: string) => {
     try {
-      const res = await api.get(`/api/products/${id}/alternatives`);
+      const res = await apiService.get(`/api/products/${id}/alternatives`);
       setAlternatives(res.data.alternatives || []);
     } catch {
       setAlternatives([]);

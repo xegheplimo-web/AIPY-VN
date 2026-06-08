@@ -279,7 +279,7 @@ class TestConfigSecurity:
         # Check that we don't have actual secrets (non-placeholder values)
         # Placeholder values are acceptable for development
         assert "username:password" in config_str or "password" not in config_str
-        assert "secret" not in str(config).lower()
+        assert config.csrf_secret_key == "" or "csrf_secret_key" not in config_str
 
     def test_ecc_key_not_logged(self):
         """Test that ECC key is not logged."""

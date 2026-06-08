@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.db import get_db
+from src.database import get_db
 from src.services.geo_search import GeoSearchService
 from src.services.geo_cache import GeoCacheService, get_geo_cache
 
