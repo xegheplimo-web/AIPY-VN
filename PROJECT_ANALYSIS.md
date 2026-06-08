@@ -771,6 +771,17 @@ updates:
     - Webhook event handling
     - Support for VND currency
 
+23. **6ad3f11** - feat(geo): add SQLite backup cache for geocoding
+    - Add GeoSQLiteCache for persistent offline cache
+    - Enhance GeoCacheService with 2-tier cache (Redis L1 + SQLite L2)
+    - Auto-fallback to SQLite when Redis unavailable
+    - Address normalization for Vietnamese
+    - Hash-based lookup for fast access
+    - API call logging and statistics
+    - Update geo.py API endpoints
+    - Add aiosqlite dependency
+    - Add GEO_SERVICE.md documentation
+
 **Overall Impact:**
 - Security Score: 7.5/10 → 9.0/10 (+1.5)
 - Performance Score: 7/10 → 9.0/10 (+2.0)
