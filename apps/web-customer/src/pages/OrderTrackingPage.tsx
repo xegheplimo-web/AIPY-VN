@@ -123,8 +123,8 @@ export default function OrderTrackingPage() {
 
   const loadOrder = async (orderId: string) => {
     try {
-      const res = await apiService.getOrder(orderId);
-      setOrder(res.data);
+      const orderData = await apiService.getOrder(orderId);
+      setOrder(orderData);
     } catch (err) {
       console.error('Failed to load order:', err);
     } finally {
@@ -137,8 +137,9 @@ export default function OrderTrackingPage() {
 
     setCancelling(true);
     try {
-      await apiService.put(`/orders/${order?.id}/cancel`);
-      if (order) loadOrder(order.id);
+      if (!order) return;
+      await apiService.cancelOrder(order.id);
+      loadOrder(order.id);
     } catch (err) {
       alert('Hủy đơn hàng thất bại');
     } finally {

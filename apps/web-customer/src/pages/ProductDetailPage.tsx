@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingCart, Heart, Share2, Store, MapPin, Star, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, Heart, MapPin, Minus, Plus, Share2, ShoppingCart, Store } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import type { Product } from '../services/api';
 import { apiService } from '../services/api';
-import type { Product, Store } from '../services/api';
 
 interface ProductOffer {
   store_id: string;
@@ -22,6 +22,8 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
 
   useEffect(() => {
     if (id) loadProduct(id);
@@ -40,15 +42,17 @@ export default function ProductDetailPage() {
       } catch {
         // Backend may not support /offers yet; fallback to store from product
         if (productData.store) {
-          setOffers([{
-            store_id: productData.store_id,
-            store_name: productData.store.name,
-            distance_m: productData.store.distance_m || 0,
-            price: productData.price || 0,
-            stock: productData.stock,
-            is_open_now: productData.store.is_open_now,
-            map_url: `https://www.google.com/maps/dir/?api=1&destination=${productData.store.latitude},${productData.store.longitude}&q=${encodeURIComponent(productData.store.name)}`,
-          }]);
+          setOffers([
+            {
+              store_id: productData.store_id,
+              store_name: productData.store.name,
+              distance_m: productData.store.distance_m || 0,
+              price: productData.price || 0,
+              stock: productData.stock,
+              is_open_now: productData.store.is_open_now,
+              map_url: `https://www.google.com/maps/dir/?api=1&destination=${productData.store.latitude},${productData.store.longitude}&q=${encodeURIComponent(productData.store.name)}`,
+            },
+          ]);
         }
       }
     } catch (err) {
@@ -81,6 +85,13 @@ export default function ProductDetailPage() {
           stock: product.stock,
           store_id: product.store_id,
           store_name: product.store?.name || '',
+          store: {
+            id: product.store_id,
+            name: product.store?.name || '',
+            address: product.store?.address || '',
+            distanceKm: product.store?.distance_m ? product.store.distance_m / 1000 : 0,
+            isSameDistrict: true,
+          },
           images: product.images,
           unit: product.unit || 'cái',
           subtotal: (product.price || 0) * quantity,
@@ -110,7 +121,10 @@ export default function ProductDetailPage() {
     return (
       <div className="max-w-lg mx-auto p-4 text-center">
         <p className="text-gray-500">Không tìm thấy sản phẩm</p>
-        <button onClick={() => navigate('/')} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg">
+        <button
+          onClick={() => navigate('/')}
+          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg"
+        >
           Quay lại
         </button>
       </div>
@@ -124,7 +138,9 @@ export default function ProductDetailPage() {
         {product.images?.[0] ? (
           <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400 text-8xl">📦</div>
+          <div className="w-full h-full flex items-center justify-center text-gray-400 text-8xl">
+            📦
+          </div>
         )}
         <button
           onClick={() => navigate(-1)}
@@ -142,8 +158,32 @@ export default function ProductDetailPage() {
             {product.category && <p className="text-gray-500 text-sm">{product.category}</p>}
           </div>
           <div className="flex gap-2">
-            <button className="p-2 bg-gray-100 rounded-full"><Heart className="w-5 h-5" /></button>
-            <button className="p-2 bg-gray-100 rounded-full"><Share2 className="w-5 h-5" /></button>
+            <button
+              onClick={async () => {
+                if (!product || favLoading) return;
+                setFavLoading(true);
+                try {
+                  if (isFavorite) {
+                    await apiService.removeFavorite(product.id);
+                    setIsFavorite(false);
+                  } else {
+                    await apiService.addFavorite(product.id);
+                    setIsFavorite(true);
+                  }
+                } catch (err) {
+                  console.error('Favorite toggle failed:', err);
+                } finally {
+                  setFavLoading(false);
+                }
+              }}
+              disabled={favLoading}
+              className="p-2 bg-gray-100 rounded-full hover:bg-red-50 disabled:opacity-50"
+            >
+              <Heart className={"w-5 h-5 " + (isFavorite ? 'text-red-500 fill-red-500' : 'text-gray-600')} />
+            </button>
+            <button className="p-2 bg-gray-100 rounded-full">
+              <Share2 className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
@@ -215,18 +255,24 @@ export default function ProductDetailPage() {
             <h3 className="font-semibold mb-3">Cửa hàng có bán gần bạn</h3>
             <div className="space-y-2">
               {offers.map((offer) => (
-                <div key={offer.store_id} className="flex items-center gap-3 p-3 bg-white border rounded-xl hover:bg-gray-50">
+                <div
+                  key={offer.store_id}
+                  className="flex items-center gap-3 p-3 bg-white border rounded-xl hover:bg-gray-50"
+                >
                   <Store className="w-5 h-5 text-blue-600 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="font-medium text-sm">{offer.store_name}</p>
                     <p className="text-xs text-gray-500">
                       {offer.distance_m < 1000
                         ? `${offer.distance_m}m`
-                        : `${(offer.distance_m / 1000).toFixed(1)}km`} · Còn {offer.stock}
+                        : `${(offer.distance_m / 1000).toFixed(1)}km`}{' '}
+                      · Còn {offer.stock}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-blue-600 font-bold text-sm">{offer.price.toLocaleString('vi-VN')}đ</p>
+                    <p className="text-blue-600 font-bold text-sm">
+                      {offer.price.toLocaleString('vi-VN')}đ
+                    </p>
                     {offer.is_open_now ? (
                       <span className="text-xs text-green-600">Đang mở</span>
                     ) : (

@@ -155,15 +155,25 @@ export default function CartPage() {
     setDeliveryMethods((prev) => ({ ...prev, [storeId]: method }));
   };
 
-  const applyPromoCode = () => {
-    if (promoCode === 'GIAM50K') {
-      setPromoApplied(true);
-      setPromoDiscount(50000);
-    } else if (promoCode === 'GIAM100K') {
-      setPromoApplied(true);
-      setPromoDiscount(100000);
-    } else {
-      alert('Mã giảm giá không hợp lệ');
+  const applyPromoCode = async () => {
+    if (!promoCode.trim()) {
+      alert('Vui lòng nhập mã giảm giá');
+      return;
+    }
+    const currentSubtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+    try {
+      const res = await apiService.validatePromotion(promoCode, currentSubtotal);
+      if (res.valid) {
+        setPromoApplied(true);
+        setPromoDiscount(res.discount);
+      } else {
+        alert('Mã giảm giá không hợp lệ');
+        setPromoApplied(false);
+        setPromoDiscount(0);
+      }
+    } catch (err) {
+      console.error('Promo validation failed:', err);
+      alert('Không thể kiểm tra mã giảm giá. Vui lòng thử lại sau.');
     }
   };
 

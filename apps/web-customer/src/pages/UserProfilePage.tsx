@@ -9,14 +9,23 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { apiService } from '../services/api';
 import { Form, FormCheckbox, FormField, FormSelect } from '../components/forms';
 import { userProfileSchema, type UserProfileFormData } from '../lib/validations';
 
 export default function UserProfilePage() {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    apiService.getProfile()
+      .then((data) => setUser(data))
+      .catch((err) => console.error('Failed to load profile:', err));
+  }, []);
 
   const menuItems = [
     { icon: ShoppingBag, label: 'Don hang cua toi', href: '/orders', badge: null },
@@ -27,10 +36,10 @@ export default function UserProfilePage() {
   const handleProfileUpdate = async (data: UserProfileFormData) => {
     setLoading(true);
     try {
-      // TODO: Call API to update profile
-      console.log('Updating profile:', data);
-      // await apiService.put('/users/profile', data);
+      await apiService.updateProfile(data as any);
       setIsEditing(false);
+      const updated = await apiService.getProfile();
+      setUser(updated);
     } catch (err) {
       alert('Cap nhat that bai, vui long thu lai!');
     } finally {
@@ -39,9 +48,9 @@ export default function UserProfilePage() {
   };
 
   const defaultValues: Partial<UserProfileFormData> = {
-    fullName: 'Nguoi dung',
-    email: 'user@example.com',
-    phone: '0123456789',
+    fullName: user?.name || user?.full_name || 'Nguoi dung',
+    email: user?.email || 'user@example.com',
+    phone: user?.phone || '0123456789',
     language: 'vi',
     currency: 'VND',
     emailNotifications: true,
@@ -59,8 +68,8 @@ export default function UserProfilePage() {
               <User className="w-8 h-8" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Nguoi dung</h1>
-              <p className="text-blue-100">user@example.com</p>
+              <h1 className="text-xl font-bold">{user?.name || user?.full_name || 'Nguoi dung'}</h1>
+              <p className="text-blue-100">{user?.email || 'user@example.com'}</p>
             </div>
           </div>
           <button
@@ -162,7 +171,12 @@ export default function UserProfilePage() {
       </div>
 
       {/* Logout */}
-      <button className="w-full mt-6 p-4 bg-red-50 text-red-600 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-100">
+      <button
+        onClick={async () => {
+          await apiService.logout();
+          navigate('/');
+        }}
+        className="w-full mt-6 p-4 bg-red-50 text-red-600 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-100">
         <LogOut className="w-5 h-5" /> Dang xuat
       </button>
     </div>

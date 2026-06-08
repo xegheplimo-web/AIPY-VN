@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { MapPin, Navigation, Filter, X, Star, Clock, Phone } from 'lucide-react';
-import InteractiveMap from '../components/InteractiveMap';
+import { Clock, Filter, MapPin, Navigation, Phone, Star, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import GeoAutocomplete from '../components/GeoAutocomplete';
+import InteractiveMap from '../components/InteractiveMap';
+import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { ScrollArea } from '../components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { ScrollArea } from '../components/ui/scroll-area';
 
 interface Store {
   id: string;
@@ -77,17 +77,17 @@ export default function StoreLocatorPage() {
 
   // Load categories
   useEffect(() => {
-    fetch('/api/geo/categories')
-      .then((res) => res.json())
-      .then((data) => setCategories(data))
+    apiService
+      .get('/api/geo/categories')
+      .then((data: any) => setCategories(data))
       .catch((err) => console.error('Failed to load categories:', err));
   }, []);
 
   // Load brands
   useEffect(() => {
-    fetch('/api/geo/brands')
-      .then((res) => res.json())
-      .then((data) => setBrands(data))
+    apiService
+      .get('/api/geo/brands')
+      .then((data: any) => setBrands(data))
       .catch((err) => console.error('Failed to load brands:', err));
   }, []);
 
@@ -109,8 +109,7 @@ export default function StoreLocatorPage() {
       if (selectedCategory) params.append('category', selectedCategory);
       if (selectedBrand) params.append('brand', selectedBrand);
 
-      const response = await fetch(`/api/geo/nearby?${params}`);
-      const data = await response.json();
+      const data = await apiService.get(`/api/geo/nearby?${params}`);
       setStores(data.stores || []);
     } catch (error) {
       console.error('Search error:', error);
@@ -131,8 +130,7 @@ export default function StoreLocatorPage() {
       if (selectedCategory) params.append('category', selectedCategory);
       if (selectedBrand) params.append('brand', selectedBrand);
 
-      const response = await fetch(`/api/geo/search?${params}`);
-      const data = await response.json();
+      const data = await apiService.get(`/api/geo/search?${params}`);
       setStores(data.stores || []);
     } catch (error) {
       console.error('Search error:', error);
@@ -176,10 +174,7 @@ export default function StoreLocatorPage() {
                 location={userLocation ? { lat: userLocation[0], lng: userLocation[1] } : undefined}
               />
             </div>
-            <Button
-              onClick={getCurrentLocation}
-              className="flex items-center gap-2"
-            >
+            <Button onClick={getCurrentLocation} className="flex items-center gap-2">
               <Navigation className="h-4 w-4" />
               Gần tôi
             </Button>
@@ -194,11 +189,7 @@ export default function StoreLocatorPage() {
             <Card className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-lg">Bộ lọc</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setShowFilters(!showFilters)}>
                   <Filter className="h-4 w-4" />
                 </Button>
               </div>
@@ -239,7 +230,9 @@ export default function StoreLocatorPage() {
                             key={cat.id}
                             onClick={() => setSelectedCategory(cat.slug)}
                             className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
-                              selectedCategory === cat.slug ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'
+                              selectedCategory === cat.slug
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'hover:bg-gray-50'
                             }`}
                           >
                             <span>{cat.icon}</span>
@@ -268,7 +261,9 @@ export default function StoreLocatorPage() {
                             key={brand.id}
                             onClick={() => setSelectedBrand(brand.slug)}
                             className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
-                              selectedBrand === brand.slug ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'
+                              selectedBrand === brand.slug
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'hover:bg-gray-50'
                             }`}
                           >
                             {brand.name}
@@ -335,14 +330,18 @@ export default function StoreLocatorPage() {
                             )}
                             <p className="text-sm text-gray-600 mt-1">{store.address}</p>
                             {store.distance && (
-                              <div className="text-sm text-blue-600 mt-1">{store.distance.text}</div>
+                              <div className="text-sm text-blue-600 mt-1">
+                                {store.distance.text}
+                              </div>
                             )}
                             {store.rating && (
                               <div className="flex items-center gap-1 mt-1">
                                 <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                                 <span className="text-sm">{store.rating}</span>
                                 {store.review_count && (
-                                  <span className="text-sm text-gray-500">({store.review_count})</span>
+                                  <span className="text-sm text-gray-500">
+                                    ({store.review_count})
+                                  </span>
                                 )}
                               </div>
                             )}
@@ -395,10 +394,8 @@ export default function StoreLocatorPage() {
           </DialogHeader>
           {selectedStore && (
             <div className="space-y-4">
-              {selectedStore.brand && (
-                <Badge variant="secondary">{selectedStore.brand.name}</Badge>
-              )}
-              
+              {selectedStore.brand && <Badge variant="secondary">{selectedStore.brand.name}</Badge>}
+
               <div className="flex items-start gap-2 text-gray-600">
                 <MapPin className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <p>{selectedStore.address}</p>
@@ -435,7 +432,9 @@ export default function StoreLocatorPage() {
                   <Clock className="h-5 w-5 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium">Giờ mở cửa</p>
-                    <p className="text-sm">{selectedStore.opening_hours.raw || 'Liên hệ cửa hàng'}</p>
+                    <p className="text-sm">
+                      {selectedStore.opening_hours.raw || 'Liên hệ cửa hàng'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -455,7 +454,9 @@ export default function StoreLocatorPage() {
 
               <div className="flex gap-2 pt-4">
                 <Button className="flex-1">Chỉ đường</Button>
-                <Button variant="outline" className="flex-1">Gọi điện</Button>
+                <Button variant="outline" className="flex-1">
+                  Gọi điện
+                </Button>
               </div>
             </div>
           )}
