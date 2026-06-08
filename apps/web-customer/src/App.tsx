@@ -12,7 +12,7 @@ const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'));
 const StoreDetailPage = lazy(() => import('./pages/StoreDetailPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
 const DemoPage = lazy(() => import('./pages/DemoPage'));
-const DesignPage = lazy(() => import('./pages/DesignPage'));
+const StoreChatPage = lazy(() => import('./pages/StoreChatPage'));
 const StoreLocatorPage = lazy(() => import('./pages/StoreLocatorPage'));
 
 function LoadingFallback() {
@@ -39,6 +39,7 @@ export default function App() {
             <Route path="profile" element={<UserProfilePage />} />
             <Route path="demo" element={<DemoPage />} />
             <Route path="design" element={<DesignPage />} />
+            <Route path="chat" element={<StoreChatPage />} />
             <Route path="locator" element={<StoreLocatorPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

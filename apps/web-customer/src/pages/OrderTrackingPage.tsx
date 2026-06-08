@@ -1,6 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Package, Clock, CheckCircle, Truck, Home } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Home,
+  MapPin,
+  MessageCircle,
+  Package,
+  Phone,
+  Truck,
+  User,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { apiService } from '../services/api';
 
 interface OrderItem {
@@ -10,13 +22,31 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  product_image?: string;
+}
+
+interface Store {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface Shipper {
+  id: string;
+  name: string;
+  phone: string;
+  avatar?: string;
+  vehicle?: string;
 }
 
 interface Order {
   id: string;
   order_number: string;
-  store_id: string;
-  delivery_method: string;
+  store: Store;
+  delivery_method: 'pickup' | 'delivery';
   subtotal: number;
   shipping_fee: number;
   total_amount: number;
@@ -25,49 +55,123 @@ interface Order {
   status: string;
   items: OrderItem[];
   created_at: string;
+  estimated_delivery?: string;
+  shipper?: Shipper;
+  shipping_address?: string;
+  notes?: string;
 }
 
-const STATUS_STEPS = ['pending', 'confirmed', 'preparing', 'ready', 'completed'];
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Cho xac nhan',
-  confirmed: 'Da xac nhan',
-  preparing: 'Dang chuan bi',
-  ready: 'San sang',
-  completed: 'Hoan thanh',
-  cancelled: 'Da huy',
-};
+interface StatusStep {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+}
 
-const STATUS_ICONS: Record<string, React.ReactNode> = {
-  pending: <Clock className="w-5 h-5" />,
-  confirmed: <CheckCircle className="w-5 h-5" />,
-  preparing: <Package className="w-5 h-5" />,
-  ready: <Truck className="w-5 h-5" />,
-  completed: <Home className="w-5 h-5" />,
+const STATUS_STEPS: StatusStep[] = [
+  {
+    key: 'pending',
+    label: 'Chờ xác nhận',
+    icon: <Clock className="w-5 h-5" />,
+    description: 'Đơn hàng đang chờ cửa hàng xác nhận',
+  },
+  {
+    key: 'confirmed',
+    label: 'Đã xác nhận',
+    icon: <CheckCircle className="w-5 h-5" />,
+    description: 'Cửa hàng đã xác nhận đơn hàng',
+  },
+  {
+    key: 'preparing',
+    label: 'Đang chuẩn bị',
+    icon: <Package className="w-5 h-5" />,
+    description: 'Đơn hàng đang được chuẩn bị',
+  },
+  {
+    key: 'shipping',
+    label: 'Đang giao',
+    icon: <Truck className="w-5 h-5" />,
+    description: 'Shipper đang giao hàng',
+  },
+  {
+    key: 'completed',
+    label: 'Hoàn tất',
+    icon: <Home className="w-5 h-5" />,
+    description: 'Đơn hàng đã hoàn tất',
+  },
+];
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Chờ xác nhận',
+  confirmed: 'Đã xác nhận',
+  preparing: 'Đang chuẩn bị',
+  ready: 'Sẵn sàng',
+  shipping: 'Đang giao',
+  completed: 'Hoàn tất',
+  cancelled: 'Đã hủy',
 };
 
 export default function OrderTrackingPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [filter, setFilter] = useState('all');
+  const { id } = useParams<{ id: string }>();
+  const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    if (id) loadOrder(id);
+  }, [id]);
 
-  const loadOrders = async () => {
+  const loadOrder = async (orderId: string) => {
     try {
-      const res = await apiService.get('/users/me/orders?limit=50');
-      setOrders(res.data.orders || []);
+      const res = await apiService.getOrder(orderId);
+      setOrder(res.data);
     } catch (err) {
-      console.error('Failed to load orders:', err);
+      console.error('Failed to load order:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredOrders = filter === 'all'
-    ? orders
-    : orders.filter(o => o.status === filter);
+  const handleCancelOrder = async () => {
+    if (!confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) return;
+
+    setCancelling(true);
+    try {
+      await apiService.put(`/orders/${order?.id}/cancel`);
+      if (order) loadOrder(order.id);
+    } catch (err) {
+      alert('Hủy đơn hàng thất bại');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleCallStore = () => {
+    if (order?.store.phone) {
+      window.location.href = `tel:${order.store.phone}`;
+    }
+  };
+
+  const handleChatStore = () => {
+    // Navigate to chat with store
+    if (order) {
+      window.location.href = `/chat?store_id=${order.store.id}`;
+    }
+  };
+
+  const handleCallShipper = () => {
+    if (order?.shipper?.phone) {
+      window.location.href = `tel:${order.shipper.phone}`;
+    }
+  };
+
+  const getCurrentStepIndex = () => {
+    if (!order) return -1;
+    const statusIndex = STATUS_STEPS.findIndex((step) => step.key === order.status);
+    return statusIndex >= 0 ? statusIndex : -1;
+  };
+
+  const canCancel = order && (order.status === 'pending' || order.status === 'confirmed');
 
   if (loading) {
     return (
@@ -77,92 +181,263 @@ export default function OrderTrackingPage() {
     );
   }
 
-  return (
-    <div className="max-w-lg mx-auto p-4 pb-8">
-      <h1 className="text-xl font-bold mb-4">Don hang cua toi</h1>
+  if (!order) {
+    return (
+      <div className="max-w-lg mx-auto p-4 text-center">
+        <AlertCircle className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-700">Không tìm thấy đơn hàng</h2>
+        <Link
+          to="/orders"
+          className="mt-4 inline-block px-6 py-2 bg-blue-600 text-white rounded-lg"
+        >
+          Xem đơn hàng của bạn
+        </Link>
+      </div>
+    );
+  }
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
-        {['all', 'pending', 'confirmed', 'preparing', 'completed'].map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilter(status)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
-              filter === status ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            {status === 'all' ? 'Tat ca' : STATUS_LABELS[status]}
-          </button>
-        ))}
+  const currentStepIndex = getCurrentStepIndex();
+
+  return (
+    <div className="max-w-lg mx-auto p-4 pb-32">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <Link to="/orders" className="p-2 hover:bg-gray-100 rounded-full">
+          <ChevronRight className="w-5 h-5 rotate-180" />
+        </Link>
+        <h1 className="text-xl font-bold">Chi tiết đơn hàng</h1>
       </div>
 
-      {/* Orders List */}
-      <div className="space-y-4">
-        {filteredOrders.length === 0 && (
-          <div className="text-center py-12">
-            <Package className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">Chua co don hang nao</p>
-            <Link to="/" className="mt-4 inline-block px-6 py-2 bg-blue-600 text-white rounded-lg">
-              Bat dau mua sam
-            </Link>
+      {/* Order Status Card */}
+      <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <p className="font-bold text-lg">{order.order_number}</p>
+            <p className="text-sm text-gray-500">
+              {new Date(order.created_at).toLocaleString('vi-VN')}
+            </p>
           </div>
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-medium ${
+              order.status === 'completed'
+                ? 'bg-green-100 text-green-700'
+                : order.status === 'cancelled'
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-blue-100 text-blue-700'
+            }`}
+          >
+            {STATUS_LABELS[order.status] || order.status}
+          </span>
+        </div>
+
+        {/* Status Timeline */}
+        <div className="space-y-4">
+          {STATUS_STEPS.map((step, idx) => {
+            const isActive = idx <= currentStepIndex;
+            const isCurrent = idx === currentStepIndex;
+            return (
+              <div key={step.key} className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      isActive ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400'
+                    } ${isCurrent ? 'ring-4 ring-blue-100' : ''}`}
+                  >
+                    {isActive ? step.icon : <span className="text-sm">{idx + 1}</span>}
+                  </div>
+                  {idx < STATUS_STEPS.length - 1 && (
+                    <div className={`w-0.5 h-8 mt-2 ${isActive ? 'bg-blue-600' : 'bg-gray-200'}`} />
+                  )}
+                </div>
+                <div className="flex-1 pb-4">
+                  <p className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {step.label}
+                  </p>
+                  <p className={`text-sm ${isActive ? 'text-gray-600' : 'text-gray-400'}`}>
+                    {step.description}
+                  </p>
+                  {isCurrent && order.estimated_delivery && (
+                    <p className="text-sm text-blue-600 mt-1">
+                      Dự kiến: {order.estimated_delivery}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Shipper Info (when shipping) */}
+      {order.status === 'shipping' && order.shipper && (
+        <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <Truck className="w-5 h-5 text-blue-600" /> Thông tin shipper
+          </h3>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <User className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium">{order.shipper.name}</p>
+              <p className="text-sm text-gray-500">{order.shipper.vehicle || 'Xe máy'}</p>
+            </div>
+            <button
+              onClick={handleCallShipper}
+              className="p-3 bg-green-50 text-green-600 rounded-full hover:bg-green-100"
+            >
+              <Phone className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Store Info */}
+      <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+        <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <Package className="w-5 h-5 text-blue-600" /> Cửa hàng
+        </h3>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <Package className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium">{order.store.name}</p>
+            <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+              <MapPin size={14} /> {order.store.address}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCallStore}
+              className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100"
+              title="Gọi cửa hàng"
+            >
+              <Phone className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleChatStore}
+              className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
+              title="Chat với cửa hàng"
+            >
+              <MessageCircle className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Delivery Address (if delivery) */}
+      {order.delivery_method === 'delivery' && order.shipping_address && (
+        <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-blue-600" /> Địa chỉ giao hàng
+          </h3>
+          <p className="text-gray-700">{order.shipping_address}</p>
+        </div>
+      )}
+
+      {/* Order Items */}
+      <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+        <h3 className="font-semibold mb-3">Sản phẩm ({order.items.length})</h3>
+        <div className="space-y-3">
+          {order.items.map((item) => (
+            <div key={item.id} className="flex gap-3">
+              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                {item.product_image ? (
+                  <img
+                    src={item.product_image}
+                    alt={item.product_name}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                ) : (
+                  <Package className="w-6 h-6 text-gray-400" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-gray-900">{item.product_name}</p>
+                <p className="text-sm text-gray-500">x{item.quantity}</p>
+              </div>
+              <p className="font-medium text-blue-600">{item.subtotal.toLocaleString('vi-VN')}đ</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Notes */}
+      {order.notes && (
+        <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+          <h3 className="font-semibold mb-2">Ghi chú</h3>
+          <p className="text-gray-600 text-sm">{order.notes}</p>
+        </div>
+      )}
+
+      {/* Payment Info */}
+      <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+        <h3 className="font-semibold mb-3">Thông tin thanh toán</h3>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Phương thức</span>
+            <span className="font-medium">
+              {order.payment_method === 'cod'
+                ? 'Thanh toán khi nhận hàng'
+                : order.payment_method === 'momo'
+                  ? 'Ví MoMo'
+                  : order.payment_method === 'zalopay'
+                    ? 'ZaloPay'
+                    : 'Thẻ'}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Trạng thái</span>
+            <span
+              className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}
+            >
+              {order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Total */}
+      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 mb-4">
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Tạm tính</span>
+            <span>{order.subtotal.toLocaleString('vi-VN')}đ</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Phí ship</span>
+            <span>
+              {order.shipping_fee === 0
+                ? 'Miễn phí'
+                : `${order.shipping_fee.toLocaleString('vi-VN')}đ`}
+            </span>
+          </div>
+          <div className="flex justify-between text-lg font-bold pt-2 border-t border-blue-200">
+            <span>Tổng cộng</span>
+            <span className="text-blue-600">{order.total_amount.toLocaleString('vi-VN')}đ</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="space-y-3">
+        {canCancel && (
+          <button
+            onClick={handleCancelOrder}
+            disabled={cancelling}
+            className="w-full py-3 border border-red-300 text-red-600 rounded-xl font-medium hover:bg-red-50 disabled:opacity-50"
+          >
+            {cancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
+          </button>
         )}
 
-        {filteredOrders.map((order) => (
-          <div key={order.id} className="bg-white rounded-xl shadow-sm border p-4">
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <p className="font-bold">{order.order_number}</p>
-                <p className="text-sm text-gray-500">
-                  {new Date(order.created_at).toLocaleDateString('vi-VN')}
-                </p>
-              </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                order.status === 'completed' ? 'bg-green-100 text-green-700' :
-                order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                'bg-blue-100 text-blue-700'
-              }`}>
-                {STATUS_LABELS[order.status] || order.status}
-              </span>
-            </div>
-
-            {/* Status Timeline */}
-            <div className="flex items-center gap-1 mb-3">
-              {STATUS_STEPS.map((step, idx) => {
-                const currentIdx = STATUS_STEPS.indexOf(order.status);
-                const isActive = idx <= currentIdx;
-                return (
-                  <div key={step} className="flex-1 flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      isActive ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400'
-                    }`}>
-                      {idx + 1}
-                    </div>
-                    <div className={`h-1 w-full mt-1 ${
-                      idx < STATUS_STEPS.length - 1 ? (isActive ? 'bg-blue-600' : 'bg-gray-200') : ''
-                    }`} />
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Items */}
-            <div className="space-y-2 mb-3">
-              {order.items.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <span>{item.product_name} x{item.quantity}</span>
-                  <span className="font-medium">{item.subtotal.toLocaleString('vi-VN')}đ</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Total */}
-            <div className="border-t pt-2 flex justify-between">
-              <span className="text-gray-500">Tong cong</span>
-              <span className="font-bold text-blue-600">{order.total_amount.toLocaleString('vi-VN')}đ</span>
-            </div>
-          </div>
-        ))}
+        <Link
+          to="/"
+          className="block w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 text-center"
+        >
+          Tiếp tục mua sắm
+        </Link>
       </div>
     </div>
   );
