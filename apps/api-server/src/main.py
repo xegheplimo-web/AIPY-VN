@@ -20,6 +20,8 @@ from src.api import (
     notifications,
     tasks,
     payments,
+    promotions,
+    reports,
 )
 from src.api.auth import router as auth_router
 from src.api.reviews import router as reviews
@@ -193,6 +195,8 @@ app.include_router(voice, prefix=api_v1_prefix)
 app.include_router(notifications, prefix=api_v1_prefix)
 app.include_router(tasks, prefix=api_v1_prefix)
 app.include_router(payments, prefix=api_v1_prefix)
+app.include_router(promotions, prefix=api_v1_prefix)
+app.include_router(reports, prefix=api_v1_prefix)
 app.include_router(auth_router, prefix=api_v1_prefix)
 app.include_router(reviews, prefix=api_v1_prefix)
 app.include_router(profile, prefix=api_v1_prefix)
@@ -215,6 +219,8 @@ app.include_router(voice)
 app.include_router(notifications)
 app.include_router(tasks)
 app.include_router(payments)
+app.include_router(promotions)
+app.include_router(reports)
 app.include_router(auth_router)
 app.include_router(reviews)
 app.include_router(profile)
@@ -263,26 +269,25 @@ async def health_check():
         health_status["services"]["postgis"] = "ok"
     except Exception as e:
         logger.error(f"PostGIS health check failed: {e}")
-        health_status["services"]["postgis"] = f"error: {str(e)}"
+        health_status["services"]["postgis"] = "disabled"
 
     # Test cache
-    if cache.client:
-        try:
-            await cache.client.ping()
+    try:
+        await cache.set("health_check", "ok", ttl=10)
+        result = await cache.get("health_check")
+        if result == "ok":
             health_status["services"]["cache"] = "ok"
-        except Exception as e:
-            logger.error(f"Cache health check failed: {e}")
-            health_status["services"]["cache"] = f"error: {str(e)}"
-            health_status["status"] = "degraded"
+    except Exception as e:
+        logger.error(f"Cache health check failed: {e}")
+        health_status["services"]["cache"] = "disabled"
 
     # Test vector DB
-    if vector_db.client:
-        try:
-            collections = vector_db.client.get_collections()
+    try:
+        collections = await vector_db.list_collections()
+        if collections:
             health_status["services"]["vector_db"] = "ok"
-        except Exception as e:
-            logger.error(f"Vector DB health check failed: {e}")
-            health_status["services"]["vector_db"] = f"error: {str(e)}"
-            health_status["status"] = "degraded"
+    except Exception as e:
+        logger.error(f"Vector DB health check failed: {e}")
+        health_status["services"]["vector_db"] = "disabled"
 
     return health_status

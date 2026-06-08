@@ -11,6 +11,8 @@ from .voice import router as voice
 from .notifications import router as notifications
 from .tasks import router as tasks
 from .payments import router as payments
+from .promotions import router as promotions
+from .reports import router as reports
 from .reviews import router as reviews
 from .profile import router as profile
 from .categories import router as categories
@@ -32,6 +34,8 @@ __all__ = [
     "notifications",
     "tasks",
     "payments",
+    "promotions",
+    "reports",
     "reviews",
     "profile",
     "categories",
