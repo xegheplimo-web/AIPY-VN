@@ -8,7 +8,6 @@ from typing import AsyncGenerator, Generator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
-from src.main import app
 from src.db import Base, get_db
 from src.models.store import Store, Product, Category
 from src.models.user import User
@@ -30,6 +29,18 @@ test_engine = create_async_engine(
 AsyncTestSessionLocal = async_sessionmaker(
     test_engine, class_=AsyncSession, expire_on_commit=False
 )
+
+# Patch src.database BEFORE importing app so API routes get test session
+import src.database as _db_module
+_db_module.async_session = AsyncTestSessionLocal
+_db_module.engine = test_engine
+
+from src.main import app
+
+# Patch database session BEFORE importing app (routes import async_session at module level)
+import src.database as _db_module
+_db_module.async_session = AsyncTestSessionLocal
+_db_module.engine = test_engine
 
 
 @pytest.fixture(scope="function")

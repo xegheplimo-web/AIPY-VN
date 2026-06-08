@@ -6,63 +6,11 @@ Tests the full request/response cycle with database.
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from src.main import app
-from src.db import Base, get_db
 from src.models.store import Store, Product, Category
 from src.models.user import User
 from src.models.order import Cart, CartItem
 import uuid
 from datetime import datetime
-from typing import AsyncGenerator
-
-# Test database URL
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test_integration.db"
-
-# Create async test engine
-engine = create_async_engine(
-    TEST_DATABASE_URL, connect_args={"check_same_thread": False}, echo=False
-)
-
-# Create async session factory
-AsyncTestSessionLocal = async_sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
-
-
-@pytest.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Create a fresh database for each test."""
-    # Create all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    session = AsyncTestSessionLocal()
-    try:
-        yield session
-    finally:
-        await session.close()
-        # Drop all tables after test
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-
-
-@pytest.fixture(scope="function")
-def client(db_session: AsyncSession):
-    """Create a test client with database access."""
-
-    async def override_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    with TestClient(app) as test_client:
-        yield test_client
-
-    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

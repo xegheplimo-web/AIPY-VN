@@ -4,7 +4,6 @@ Configuration validation and management.
 Validates required environment variables and provides configuration access.
 """
 
-import os
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
@@ -19,9 +18,11 @@ class DatabaseConfig(BaseModel):
 
     @field_validator("url")
     def validate_database_url(cls, v):
-        if not v or "username:password" in v:
+        if not v:
+            raise ValueError("DATABASE_URL must be set")
+        if "username:password" in v:
             raise ValueError(
-                "DATABASE_URL must be set with actual credentials (not username:password)"
+                "DATABASE_URL must be set with actual credentials, not placeholder 'username:password'"
             )
         return v
 
@@ -216,7 +217,11 @@ class AppConfig(BaseSettings):
     # CSRF
     csrf_secret_key: str = Field(default="", alias="CSRF_SECRET_KEY")
 
-    model_config = {"env_file": ".env", "case_sensitive": False, "extra": "allow"}
+    model_config = {
+        "env_file": [".env", "../.env"],
+        "case_sensitive": False,
+        "extra": "allow",
+    }
 
     @field_validator("environment")
     def validate_environment(cls, v):

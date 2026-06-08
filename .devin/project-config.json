@@ -1,5 +1,185 @@
 {
-  "timestamp": "2026-06-07 20:31:45",
-  "projectPath": "A:\\AIPY\\vietstore-rag",
-  "projectType": "javascript"
+  "version": "2.0",
+  "timestamp": "2026-06-08 07:22:43",
+  "projectPath": "C:\\Users\\atton\\AIPY-VN",
+  "projectName": "AIPY-VN",
+  "projectTypes": [
+    "python",
+    "typescript"
+  ],
+  "frameworks": [
+    "fastapi",
+    "react"
+  ],
+  "databases": [
+    "orm"
+  ],
+  "testing": [
+    "pytest",
+    "playwright"
+  ],
+  "packageManager": "pnpm",
+  "pythonManager": "uv",
+  "isMonorepo": true,
+  "hasDocker": true,
+  "hasCI": true,
+  "excludePatterns": [
+    "**/*.egg-info/**",
+    "**/*.map",
+    "**/*.min.css",
+    "**/*.min.js",
+    "**/.git/**",
+    "**/.mypy_cache/**",
+    "**/.next/**",
+    "**/.nuxt/**",
+    "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    "**/.turbo/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/playwright-report/**",
+    "**/postgres_data/**",
+    "**/redis_data/**",
+    "**/target/**",
+    "**/test-results/**"
+  ],
+  "settings": {
+    "contextWindow": "maximum",
+    "codeUnderstanding": "deep",
+    "enableParallelQueries": true,
+    "maxParallelCalls": 10,
+    "enableCaching": true,
+    "smartContextSelection": true,
+    "autoDetectProjectType": true,
+    "preferCodegraphOverGrep": true,
+    "python": {
+      "linter": "ruff",
+      "formatter": "ruff",
+      "typeChecker": "mypy",
+      "testRunner": "pytest",
+      "importSorting": "ruff",
+      "docstringStyle": "google",
+      "strictTypeHints": true
+    },
+    "typescript": {
+      "strictMode": true,
+      "linter": "eslint",
+      "formatter": "prettier",
+      "typeChecker": "tsc",
+      "testRunner": "node",
+      "bundler": "vite"
+    }
+  },
+  "aiConfig": {
+    "preferStructuralSearch": true,
+    "useCodeGraphFirst": true,
+    "aggressiveOptimization": true,
+    "cacheSymbolReferences": true,
+    "cacheFileRelationships": true,
+    "prefetchRelatedFiles": true,
+    "lazyLoadLargeFiles": true,
+    "enableAutoVerification": true,
+    "verification": {
+      "autoRunTests": true,
+      "autoRunLint": true,
+      "autoRunTypecheck": true,
+      "autoRunBuild": false,
+      "failFast": true,
+      "maxRetries": 3
+    }
+  },
+  "skillsAutoInvoke": {
+    "gitnexus-exploring": {
+      "enabled": true,
+      "triggers": [
+        "how does",
+        "explain",
+        "architecture",
+        "flow",
+        "trace",
+        "cach hoat dong"
+      ]
+    },
+    "gitnexus-impact-analysis": {
+      "enabled": true,
+      "triggers": [
+        "impact",
+        "break",
+        "affect",
+        "change",
+        "refactor",
+        "rename",
+        "anh huong"
+      ]
+    },
+    "gitnexus-debugging": {
+      "enabled": true,
+      "triggers": [
+        "bug",
+        "error",
+        "fail",
+        "debug",
+        "fix",
+        "why",
+        "loi",
+        "sua"
+      ]
+    },
+    "gitnexus-refactoring": {
+      "enabled": true,
+      "triggers": [
+        "refactor",
+        "extract",
+        "rename",
+        "move",
+        "split",
+        "tai cau truc"
+      ]
+    },
+    "gitnexus-pr-review": {
+      "enabled": true,
+      "triggers": [
+        "review",
+        "pr",
+        "pull request",
+        "merge",
+        "danh gia"
+      ]
+    }
+  },
+  "detectedFingerprint": [
+    "database",
+    "docker",
+    "fastapi",
+    "github_actions",
+    "go",
+    "has_tests",
+    "java",
+    "javascript",
+    "jest",
+    "monorepo",
+    "npm",
+    "nx",
+    "playwright",
+    "pnpm",
+    "pydantic",
+    "pytest",
+    "python",
+    "react",
+    "react_query",
+    "rust",
+    "sqlalchemy",
+    "tailwind",
+    "turbo",
+    "typescript",
+    "uv",
+    "vite",
+    "vitest",
+    "yarn",
+    "zustand"
+  ]
 }
