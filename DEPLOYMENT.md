@@ -1,441 +1,327 @@
-# VietStore RAG - Deployment Guide
+# Deployment Guide for AIPY-VN
 
-## Overview
-
-VietStore RAG is a full-stack e-commerce marketplace with AI-powered search, consisting of:
-- **Backend**: FastAPI with PostgreSQL, Redis, Qdrant
-- **Frontend**: 3 React apps (Customer, Owner, Admin)
-- **Security**: ECC cryptography for JWT signing and E2E encryption
+This guide covers deploying the VietStore RAG application to production.
 
 ## Prerequisites
 
-- Docker & Docker Compose
-- Node.js 18+ (for local development)
-- Python 3.11+ (for local development)
-- Git
+- Docker and Docker Compose installed
+- Kubernetes cluster (optional, for K8s deployment)
+- Domain name configured
+- SSL certificates (for HTTPS)
+- Environment variables configured
 
-## Quick Start
+## Environment Variables
 
-### 1. Clone Repository
+Create a `.env.production` file:
 
-```bash
-git clone <repository-url>
-cd AIPY-VN
+```env
+# Database
+POSTGRES_USER=your_postgres_user
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=vietstore
+
+# Redis
+REDIS_PASSWORD=your_redis_password
+
+# API
+API_URL=https://api.vietstore.vn
+CORS_ORIGINS=https://vietstore.vn,https://owner.vietstore.vn,https://admin.vietstore.vn
+
+# Security
+JWT_SECRET_KEY=your_jwt_secret_key
+ECC_PRIVATE_KEY_PEM=your_ecc_private_key_pem
+CSRF_SECRET_KEY=your_csrf_secret_key
+
+# Monitoring
+GRAFANA_USER=admin
+GRAFANA_PASSWORD=your_grafana_password
+GRAFANA_URL=https://grafana.vietstore.vn
+
+# Sentry (Error Tracking)
+SENTRY_DSN=your_sentry_dsn
+SENTRY_ENVIRONMENT=production
+
+# Docker Registry
+DOCKER_REGISTRY=docker.io
+IMAGE_TAG=latest
 ```
 
-### 2. Environment Setup
+## Deployment Methods
 
+### Method 1: Docker Compose (Recommended for small deployments)
+
+#### Development
 ```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your configuration
-# IMPORTANT: Generate ECC_PRIVATE_KEY_PEM for production
-```
-
-### 3. Start Services
-
-```bash
-# Start all services (PostgreSQL, Redis, Qdrant, API, Frontends)
-docker compose up -d
-
-# Check service status
-docker compose ps
+# Start all services
+docker-compose up -d
 
 # View logs
-docker compose logs -f api-server
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
-### 4. Database Migrations
-
+#### Production
 ```bash
-# Run Alembic migrations
-cd apps/api-server
-alembic upgrade head
+# Build images
+docker-compose -f docker-compose.prod.yml build
 
-# Or run inside Docker
-docker compose exec api-server alembic upgrade head
+# Start production services
+docker-compose -f docker-compose.prod.yml up -d
+
+# View logs
+docker-compose -f docker-compose.prod.yml logs -f
+
+# Stop services
+docker-compose -f docker-compose.prod.yml down
 ```
 
-### 5. Seed Data (Optional)
+### Method 2: Kubernetes (Recommended for large deployments)
 
+#### Prerequisites
+- kubectl configured
+- Kubernetes cluster running
+- NGINX Ingress Controller installed
+
+#### Deploy
 ```bash
-# Seed stores and products
-docker compose exec api-server python src/seed.py
+# Apply all configurations
+kubectl apply -f k8s/
+
+# Check status
+kubectl get pods -n vietstore
+
+# Get services
+kubectl get services -n vietstore
+
+# View logs
+kubectl logs -f deployment/api-server -n vietstore
 ```
 
-### 6. Access Applications
-
-- **Customer App**: http://localhost:3000
-- **Owner App**: http://localhost:3001
-- **Admin App**: http://localhost:3002
-- **API Documentation**: http://localhost:9000/docs
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Nginx (Optional)                      │
-└─────────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-┌───────▼────────┐  ┌──────▼────────┐  ┌──────▼────────┐
-│  Web Customer  │  │   Web Owner   │  │   Web Admin   │
-│  (React/Vite)   │  │  (React/Vite)  │  │  (React/Vite)  │
-│    Port 3000    │  │    Port 3001   │  │    Port 3002   │
-└────────┬────────┘  └────────┬────────┘  └────────┬────────┘
-         │                    │                    │
-         └────────────────────┼────────────────────┘
-                              │
-                    ┌───────▼────────┐
-                    │  FastAPI API    │
-                    │   Port 9000     │
-                    └────────┬────────┘
-                           │
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-┌───────▼────────┐ ┌──────▼────────┐ ┌──────▼────────┐
-│  PostgreSQL    │ │     Redis      │ │    Qdrant     │
-│  (PostGIS)     │ │   (Cache)      │ │  (Vector DB)  │
-│   Port 5432     │ │   Port 6379     │ │   Port 6333    │
-└────────────────┘ └────────────────┘ └────────────────┘
-```
-
-## Services
-
-### PostgreSQL (PostGIS)
-- **Port**: 5432
-- **Database**: vietstore
-- **Features**: Spatial data support for store locations
-
-### Redis
-- **Port**: 6379
-- **Purpose**: Caching, session storage, rate limiting
-
-### Qdrant
-- **Port**: 6333
-- **Purpose**: Vector embeddings for AI search
-
-### API Server
-- **Port**: 9000
-- **Framework**: FastAPI
-- **Features**: ECC-signed JWT, E2E encryption, rate limiting
-
-### Web Apps
-- **Customer**: Port 3000
-- **Owner**: Port 3001
-- **Admin**: Port 3002
-
-## Development
-
-### Local Development (without Docker)
-
-#### Backend
-
+#### Scale
 ```bash
-cd apps/api-server
+# Scale API server
+kubectl scale deployment api-server --replicas=3 -n vietstore
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set environment
-export $(cat .env | xargs)
-
-# Run migrations
-alembic upgrade head
-
-# Run server
-uvicorn src.main:app --reload --port 9000
+# Scale frontend apps
+kubectl scale deployment web-customer --replicas=2 -n vietstore
+kubectl scale deployment web-owner --replicas=2 -n vietstore
+kubectl scale deployment web-admin --replicas=1 -n vietstore
 ```
 
-#### Frontend
+### Method 3: CI/CD Deployment
 
+The CI/CD pipeline automatically deploys to:
+- **Staging**: When pushing to `develop` branch
+- **Production**: When pushing to `master` branch
+
+#### Manual Deployment
 ```bash
-# Customer App
-cd apps/web-customer
-npm install
-npm run dev  # Port 3000
+# Deploy to staging
+git push origin develop
 
-# Owner App
-cd apps/web-owner
-npm install
-npm run dev  # Port 3001
-
-# Admin App
-cd apps/web-admin
-npm install
-npm run dev  # Port 3002
-```
-
-### Database Management
-
-```bash
-# Create migration
-cd apps/api-server
-alembic revision --autogenerate -m "description"
-
-# Apply migration
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
-
-# View migration history
-alembic history
-```
-
-## Production Deployment
-
-### 1. Generate ECC Keys
-
-```bash
-# Generate ECC private key (do this ONCE and keep secure)
-python -c "
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
-
-private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
-pem = private_key.private_bytes(
-    encoding=serialization.Encoding.PEM,
-    format=serialization.PrivateFormat.PKCS8,
-    encryption_algorithm=serialization.NoEncryption()
-)
-print(pem.decode())
-"
-```
-
-Add the generated key to your production `.env`:
-```
-ECC_PRIVATE_KEY_PEM=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
-```
-
-### 2. Configure Environment Variables
-
-Update `.env` for production:
-```bash
-ENVIRONMENT=production
-DEBUG=false
-DATABASE_URL=postgresql+asyncpg://user:password@prod-db:5432/vietstore
-CORS_ORIGINS=https://your-domain.com
-PRODUCTION_FRONTEND_URL=https://your-domain.com
-SENTRY_DSN=your-production-sentry-dsn
-```
-
-### 3. Build Docker Images
-
-```bash
-# Build all services
-docker compose build
-
-# Or build individually
-docker compose build api-server
-docker compose build web-customer
-docker compose build web-owner
-docker compose build web-admin
-```
-
-### 4. Deploy
-
-Option A: Docker Compose (Simple)
-```bash
-docker compose up -d
-```
-
-Option B: Kubernetes (Scalable)
-- Use provided Kubernetes manifests
-- Configure ingress, load balancer, auto-scaling
-
-Option C: Cloud Provider
-- **AWS**: ECS, RDS, ElastiCache
-- **GCP**: Cloud Run, Cloud SQL, Memorystore
-- **Azure**: Container Instances, Azure SQL, Redis Cache
-
-### 5. SSL/TLS Configuration
-
-Use Nginx or cloud load balancer for SSL termination.
-
-Example Nginx config:
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://web-customer:3000;
-    }
-}
+# Deploy to production
+git push origin master
 ```
 
 ## Monitoring
 
-### Health Checks
+### Prometheus
+- URL: `http://localhost:9090` (or your domain)
+- Metrics: System metrics, API metrics, custom metrics
 
-```bash
-# API health check
-curl http://localhost:9000/health
-
-# Expected response:
-{
-  "status": "ok",
-  "version": "1.0.0",
-  "environment": "production",
-  "services": {
-    "database": "ok",
-    "cache": "ok",
-    "vector_db": "ok",
-    "postgis": "ok"
-  }
-}
-```
+### Grafana
+- URL: `http://localhost:3003` (or your domain)
+- Default credentials: admin/admin (change in production)
+- Dashboards: Pre-configured dashboards for monitoring
 
 ### Logs
-
+View logs with Docker Compose:
 ```bash
-# View all logs
-docker compose logs -f
+# API server logs
+docker-compose logs -f api-server
 
-# View specific service
-docker compose logs -f api-server
-docker compose logs -f web-customer
+# All logs
+docker-compose logs -f
 ```
 
-### Metrics
-
-- **Sentry**: Error tracking (configure SENTRY_DSN)
-- **Prometheus**: Metrics collection (optional)
-- **Grafana**: Visualization (optional)
-
-## Security
-
-### ECC Cryptography
-
-- **JWT Signing**: ECDSA with P-256 curve
-- **E2E Encryption**: ECDH key exchange + AES-GCM
-- **API Signing**: Digital signatures for sensitive requests
-
-### Best Practices
-
-1. **Never commit** `.env` or private keys
-2. **Rotate** ECC keys every 90 days
-3. **Use** strong passwords for database
-4. **Enable** rate limiting in production
-5. **Configure** CORS properly
-6. **Use** HTTPS in production
-7. **Keep** dependencies updated
-
-## Troubleshooting
-
-### Database Connection Failed
-
+View logs with Kubernetes:
 ```bash
-# Check PostgreSQL is running
-docker compose ps postgres
+# API server logs
+kubectl logs -f deployment/api-server -n vietstore
 
-# Check logs
-docker compose logs postgres
-
-# Restart database
-docker compose restart postgres
+# All pods logs
+kubectl logs -f -n vietstore --all-containers=true
 ```
 
-### API Not Responding
+## SSL/TLS Configuration
+
+### Using Let's Encrypt with Certbot
 
 ```bash
-# Check API logs
-docker compose logs api-server
+# Install certbot
+sudo apt-get install certbot
 
-# Restart API
-docker compose restart api-server
+# Generate certificates
+sudo certbot certonly --standalone -d vietstore.vn -d api.vietstore.vn
 
-# Check dependencies
-docker compose ps
+# Copy certificates to nginx/ssl
+sudo cp /etc/letsencrypt/live/vietstore.vn/fullchain.pem nginx/ssl/
+sudo cp /etc/letsencrypt/live/vietstore.vn/privkey.pem nginx/ssl/
 ```
 
-### Frontend Build Failed
+### Using Self-Signed Certificates (Development Only)
 
 ```bash
-# Clear node_modules
-rm -rf apps/web-customer/node_modules
-rm -rf apps/web-owner/node_modules
-rm -rf apps/web-admin/node_modules
-
-# Rebuild
-docker compose build web-customer web-owner web-admin
+# Generate self-signed certificate
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout nginx/ssl/privkey.pem \
+  -out nginx/ssl/fullchain.pem
 ```
 
-## Backup & Restore
+## Backup and Restore
 
 ### Database Backup
-
 ```bash
 # Backup
-docker compose exec postgres pg_dump -U postgres vietstore > backup.sql
+docker-compose exec postgres pg_dump -U postgres vietstore > backup.sql
 
 # Restore
-docker compose exec -T postgres psql -U postgres vietstore < backup.sql
+docker-compose exec -T postgres psql -U postgres vietstore < backup.sql
 ```
 
 ### Volume Backup
-
 ```bash
 # Backup volumes
-docker run --rm -v vietstore_pgdata:/data -v $(pwd):/backup alpine tar czf /backup/pgdata.tar.gz /data
+docker run --rm -v vietstore_postgres_data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/postgres-backup.tar.gz /data
 
 # Restore volumes
-docker run --rm -v vietstore_pgdata:/data -v $(pwd):/backup alpine tar xzf /backup/pgdata.tar.gz -C /
+docker run --rm -v vietstore_postgres_data:/data -v $(pwd):/backup \
+  alpine tar xzf /backup/postgres-backup.tar.gz -C /
 ```
 
-## Scaling
+## Troubleshooting
 
-### Horizontal Scaling
+### Database Connection Issues
+```bash
+# Check postgres health
+docker-compose ps postgres
 
+# Check postgres logs
+docker-compose logs postgres
+
+# Restart postgres
+docker-compose restart postgres
+```
+
+### Redis Connection Issues
+```bash
+# Check redis health
+docker-compose ps redis
+
+# Check redis logs
+docker-compose logs redis
+
+# Test redis connection
+docker-compose exec redis redis-cli ping
+```
+
+### API Server Issues
+```bash
+# Check API logs
+docker-compose logs api-server
+
+# Restart API server
+docker-compose restart api-server
+
+# Check environment variables
+docker-compose config
+```
+
+### Frontend Build Issues
+```bash
+# Rebuild frontend
+docker-compose build web-customer
+
+# Check build logs
+docker-compose logs web-customer
+```
+
+## Performance Tuning
+
+### PostgreSQL
 ```yaml
-# docker-compose.yml
+# Add to docker-compose.yml
+postgres:
+  command:
+    - postgres
+    - -c
+    - shared_buffers=256MB
+    - -c
+    - effective_cache_size=1GB
+    - -c
+    - maintenance_work_mem=64MB
+    - -c
+    - checkpoint_completion_target=0.9
+    - -c
+    - wal_buffers=16MB
+    - -c
+    - default_statistics_target=100
+    - -c
+    - random_page_cost=1.1
+    - -c
+    - effective_io_concurrency=200
+    - -c
+    - work_mem=1310kB
+    - -c
+    - min_wal_size=1GB
+    - -c
+    - max_wal_size=4GB
+```
+
+### Redis
+```yaml
+# Add to docker-compose.yml
+redis:
+  command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+```
+
+### API Server
+```yaml
+# Add to docker-compose.yml
 api-server:
   deploy:
-    replicas: 3
     resources:
       limits:
-        cpus: '2.0'
+        cpus: '2'
+        memory: 2G
+      reservations:
+        cpus: '1'
         memory: 1G
 ```
 
-### Load Balancing
+## Security Checklist
 
-Use Nginx, HAProxy, or cloud load balancer to distribute traffic.
-
-## Performance Optimization
-
-### Database
-
-- Enable connection pooling
-- Add indexes for frequently queried columns
-- Use read replicas for reporting
-
-### Cache
-
-- Use Redis for session storage
-- Cache API responses
-- Implement query result caching
-
-### Frontend
-
-- Enable code splitting
-- Use lazy loading for images
-- Implement service worker for offline support
+- [ ] Change all default passwords
+- [ ] Use strong JWT secret keys
+- [ ] Configure ECC private keys
+- [ ] Enable HTTPS with valid SSL certificates
+- [ ] Configure CORS properly
+- [ ] Enable rate limiting
+- [ ] Configure firewall rules
+- [ ] Enable security headers
+- [ ] Set up monitoring and alerting
+- [ ] Configure backup strategy
+- [ ] Review and update dependencies regularly
+- [ ] Enable audit logging
+- [ ] Configure Sentry for error tracking
 
 ## Support
 
 For issues or questions:
-- Check logs: `docker compose logs`
-- Review documentation: `/docs`
-- Open issue on GitHub
+- Check logs: `docker-compose logs -f`
+- Check health: `docker-compose ps`
+- Review documentation: `docs/`
+- Open an issue on GitHub
