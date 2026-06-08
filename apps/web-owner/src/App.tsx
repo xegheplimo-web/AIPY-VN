@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import OwnerLayout from './components/layout/OwnerLayout';
 import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import BulkUploadPage from './pages/BulkUploadPage';
 import OwnerAnalyticsPage from './pages/OwnerAnalyticsPage';
 import OwnerChatPage from './pages/OwnerChatPage';
@@ -17,9 +18,19 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Routes>
+          {/* Public routes - NOT protected */}
           <Route path="/login" element={<OwnerLoginPage />} />
           <Route path="/register" element={<StoreRegistrationPage />} />
-          <Route path="/" element={<OwnerLayout />}>
+
+          {/* Protected owner routes */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <OwnerLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<OwnerDashboardPage />} />
             <Route path="dashboard" element={<OwnerDashboardPage />} />
             <Route path="analytics" element={<OwnerAnalyticsPage />} />

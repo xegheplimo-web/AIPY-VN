@@ -5,6 +5,8 @@ Endpoints for managing user profile information.
 """
 
 import logging
+import os
+import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, EmailStr, Field
@@ -16,6 +18,18 @@ from src.models.user import Address, User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/users/me", tags=["User Profile"])
+
+# Allowed image extensions and MIME types
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+ALLOWED_MIME_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+# Upload directory (relative to project root)
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads", "avatars")
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -76,21 +90,29 @@ class AddressResponse(BaseModel):
     created_at: str
     updated_at: str | None
     model_config = {"from_attributes": True}
+
+
 @router.get("/profile", response_model=ProfileResponse)
 async def get_profile(current_user: User = Depends(require_auth)):
     """Get current user's profile information."""
-    return ProfileResponse(
-        id=str(current_user.id),
-        email=current_user.email,
-        phone=current_user.phone,
-        full_name=current_user.full_name,
-        avatar_url=current_user.avatar_url,
-        role=current_user.role,
-        is_verified=current_user.is_verified,
-        is_active=current_user.is_active,
-        created_at=str(current_user.created_at) if current_user.created_at else None,
-        updated_at=str(current_user.updated_at) if current_user.updated_at else None,
-    )
+    user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return ProfileResponse(
+            id=str(user.id),
+            email=user.email,
+            phone=user.phone,
+            full_name=user.full_name,
+            avatar_url=user.avatar_url,
+            role=user.role,
+            is_verified=user.is_verified,
+            is_active=user.is_active,
+            created_at=str(user.created_at) if user.created_at else "",
+            updated_at=str(user.updated_at) if user.updated_at else None,
+        )
 
 
 @router.put("/profile", response_model=ProfileResponse)
@@ -103,9 +125,15 @@ async def update_profile(
 
     - Email uniqueness will be checked if email is being changed
     """
+    user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
     async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
         # Check email uniqueness if email is being changed
-        if data.email and data.email != current_user.email:
+        if data.email and data.email != user.email:
             existing_query = select(User).where(User.email == data.email)
             existing_result = await session.execute(existing_query)
             if existing_result.scalar_one_or_none():
@@ -113,28 +141,28 @@ async def update_profile(
 
         # Update user profile
         if data.full_name is not None:
-            current_user.full_name = data.full_name
+            user.full_name = data.full_name
         if data.email is not None:
-            current_user.email = data.email
+            user.email = data.email
         if data.phone is not None:
-            current_user.phone = data.phone
+            user.phone = data.phone
         if data.avatar_url is not None:
-            current_user.avatar_url = data.avatar_url
+            user.avatar_url = data.avatar_url
 
         await session.commit()
-        await session.refresh(current_user)
+        await session.refresh(user)
 
         return ProfileResponse(
-            id=str(current_user.id),
-            email=current_user.email,
-            phone=current_user.phone,
-            full_name=current_user.full_name,
-            avatar_url=current_user.avatar_url,
-            role=current_user.role,
-            is_verified=current_user.is_verified,
-            is_active=current_user.is_active,
-            created_at=str(current_user.created_at) if current_user.created_at else None,
-            updated_at=str(current_user.updated_at) if current_user.updated_at else None,
+            id=str(user.id),
+            email=user.email,
+            phone=user.phone,
+            full_name=user.full_name,
+            avatar_url=user.avatar_url,
+            role=user.role,
+            is_verified=user.is_verified,
+            is_active=user.is_active,
+            created_at=str(user.created_at) if user.created_at else "",
+            updated_at=str(user.updated_at) if user.updated_at else None,
         )
 
 
@@ -146,20 +174,106 @@ async def upload_avatar(
     """
     Upload user avatar image.
 
-    TODO: Implement actual file upload to cloud storage (S3, Cloudinary, etc.)
-    For now, returns a mock URL.
+    - Accepts jpg, jpeg, png, webp formats only
+    - Maximum file size: 5MB
+    - Saves to local uploads/avatars/ directory
+    - Returns the relative URL path for the uploaded avatar
     """
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
+    user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
 
-    # TODO: Upload to cloud storage and get URL
-    # For now, return a placeholder URL
-    avatar_url = f"https://example.com/avatars/{current_user.id}/{file.filename}"
+    # Validate file content type
+    if not file.content_type or file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
 
+    # Validate file extension
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+
+    file_ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file extension. Allowed extensions: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    # Read file content and validate size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds the maximum limit of {MAX_FILE_SIZE // (1024 * 1024)}MB",
+        )
+
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    # Ensure upload directory exists
+    upload_dir = os.path.abspath(UPLOAD_DIR)
+    try:
+        os.makedirs(upload_dir, exist_ok=True)
+    except OSError as e:
+        logger.error(f"Failed to create upload directory {upload_dir}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Avatar upload service is currently unavailable. Please try again later.",
+        )
+
+    # Check if directory is writable
+    if not os.access(upload_dir, os.W_OK):
+        logger.error(f"Upload directory is not writable: {upload_dir}")
+        raise HTTPException(
+            status_code=500,
+            detail="Avatar upload service is currently unavailable. Please try again later.",
+        )
+
+    # Generate unique filename
+    unique_id = uuid.uuid4().hex[:8]
+    filename = f"{user_id}_{unique_id}.{file_ext}"
+    file_path = os.path.join(upload_dir, filename)
+
+    # Save file to disk
+    try:
+        with open(file_path, "wb") as f:
+            f.write(content)
+    except OSError as e:
+        logger.error(f"Failed to save avatar file to {file_path}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save avatar. Please try again later.",
+        )
+
+    # Build the relative URL path
+    avatar_url = f"/uploads/avatars/{filename}"
+
+    # Update user avatar_url in database
     async with async_session() as session:
-        current_user.avatar_url = avatar_url
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            # Clean up the uploaded file if user not found
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Remove old avatar file if it was a local upload
+        if user.avatar_url and user.avatar_url.startswith("/uploads/avatars/"):
+            old_filename = user.avatar_url.split("/")[-1]
+            old_file_path = os.path.join(upload_dir, old_filename)
+            try:
+                if os.path.exists(old_file_path):
+                    os.remove(old_file_path)
+            except OSError as e:
+                logger.warning(f"Failed to remove old avatar {old_file_path}: {e}")
+
+        user.avatar_url = avatar_url
         await session.commit()
-        await session.refresh(current_user)
+
+    logger.info(f"Avatar uploaded successfully for user {user_id}: {avatar_url}")
 
     return {"avatar_url": avatar_url, "message": "Avatar uploaded successfully"}
 
@@ -167,10 +281,11 @@ async def upload_avatar(
 @router.get("/addresses", response_model=list[AddressResponse])
 async def get_addresses(current_user: User = Depends(require_auth)):
     """Get all addresses for the current user."""
+    user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
     async with async_session() as session:
         query = (
             select(Address)
-            .where(Address.user_id == current_user.id)
+            .where(Address.user_id == user_id)
             .order_by(Address.is_default.desc(), Address.created_at.desc())
         )
         result = await session.execute(query)
@@ -190,7 +305,7 @@ async def get_addresses(current_user: User = Depends(require_auth)):
                 is_default=addr.is_default,
                 latitude=addr.latitude,
                 longitude=addr.longitude,
-                created_at=str(addr.created_at) if addr.created_at else None,
+                created_at=str(addr.created_at) if addr.created_at else "",
                 updated_at=str(addr.updated_at) if addr.updated_at else None,
             )
             for addr in addresses
@@ -207,11 +322,12 @@ async def create_address(
 
     - If is_default is True, will set other addresses to non-default
     """
+    user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
     async with async_session() as session:
         # If setting as default, unset other default addresses
         if data.is_default:
             update_query = select(Address).where(
-                and_(Address.user_id == current_user.id, Address.is_default)
+                and_(Address.user_id == user_id, Address.is_default)
             )
             result = await session.execute(update_query)
             default_addresses = result.scalars().all()
@@ -220,7 +336,7 @@ async def create_address(
 
         # Create new address
         address = Address(
-            user_id=current_user.id,
+            user_id=user_id,
             full_name=data.full_name,
             phone=data.phone,
             address_line=data.address_line,
@@ -250,7 +366,7 @@ async def create_address(
             is_default=address.is_default,
             latitude=address.latitude,
             longitude=address.longitude,
-            created_at=str(address.created_at) if address.created_at else None,
+            created_at=str(address.created_at) if address.created_at else "",
             updated_at=str(address.updated_at) if address.updated_at else None,
         )
 
@@ -267,6 +383,7 @@ async def update_address(
     - User can only update their own addresses
     - If setting as default, will unset other default addresses
     """
+    user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
     async with async_session() as session:
         query = select(Address).where(Address.id == address_id)
         result = await session.execute(query)
@@ -275,7 +392,7 @@ async def update_address(
         if not address:
             raise HTTPException(status_code=404, detail="Address not found")
 
-        if address.user_id != current_user.id:
+        if address.user_id != user_id:
             raise HTTPException(
                 status_code=403, detail="You can only update your own addresses"
             )
@@ -284,7 +401,7 @@ async def update_address(
         if data.is_default and not address.is_default:
             update_query = select(Address).where(
                 and_(
-                    Address.user_id == current_user.id,
+                    Address.user_id == user_id,
                     Address.id != address_id,
                     Address.is_default,
                 )
@@ -322,8 +439,8 @@ async def update_address(
             is_default=address.is_default,
             latitude=address.latitude,
             longitude=address.longitude,
-            created_at=address.created_at,
-            updated_at=address.updated_at,
+            created_at=str(address.created_at) if address.created_at else "",
+            updated_at=str(address.updated_at) if address.updated_at else None,
         )
 
 
@@ -338,6 +455,7 @@ async def delete_address(
     - User can only delete their own addresses
     - Cannot delete default address if it's the only address
     """
+    user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
     async with async_session() as session:
         query = select(Address).where(Address.id == address_id)
         result = await session.execute(query)
@@ -346,13 +464,13 @@ async def delete_address(
         if not address:
             raise HTTPException(status_code=404, detail="Address not found")
 
-        if address.user_id != current_user.id:
+        if address.user_id != user_id:
             raise HTTPException(
                 status_code=403, detail="You can only delete your own addresses"
             )
 
         # Check if it's the only address
-        count_query = select(Address).where(Address.user_id == current_user.id)
+        count_query = select(Address).where(Address.user_id == user_id)
         count_result = await session.execute(count_query)
         total_addresses = count_result.scalar() or 0
 
@@ -367,7 +485,7 @@ async def delete_address(
                 select(Address)
                 .where(
                     and_(
-                        Address.user_id == current_user.id,
+                        Address.user_id == user_id,
                         Address.id != address_id,
                     )
                 )
@@ -395,6 +513,7 @@ async def set_default_address(
     - User can only set their own addresses as default
     - Will unset other default addresses
     """
+    user_id = current_user["id"] if isinstance(current_user, dict) else current_user.id
     async with async_session() as session:
         query = select(Address).where(Address.id == address_id)
         result = await session.execute(query)
@@ -403,7 +522,7 @@ async def set_default_address(
         if not address:
             raise HTTPException(status_code=404, detail="Address not found")
 
-        if address.user_id != current_user.id:
+        if address.user_id != user_id:
             raise HTTPException(
                 status_code=403, detail="You can only set your own addresses"
             )
@@ -411,7 +530,7 @@ async def set_default_address(
         # Unset other default addresses
         update_query = select(Address).where(
             and_(
-                Address.user_id == current_user.id,
+                Address.user_id == user_id,
                 Address.id != address_id,
                 Address.is_default,
             )
@@ -440,6 +559,6 @@ async def set_default_address(
             is_default=address.is_default,
             latitude=address.latitude,
             longitude=address.longitude,
-            created_at=address.created_at,
-            updated_at=address.updated_at,
+            created_at=str(address.created_at) if address.created_at else "",
+            updated_at=str(address.updated_at) if address.updated_at else None,
         )

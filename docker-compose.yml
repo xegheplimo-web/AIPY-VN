@@ -138,6 +138,23 @@ services:
       - vietstore-network
     restart: unless-stopped
 
+  # Celery Worker
+  celery-worker:
+    build: ./apps/api-server
+    container_name: vietstore-celery-worker
+    command: celery -A src.celery_app worker --loglevel=info --concurrency=2 -Q email,notifications,orders
+    env_file: ./apps/api-server/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./apps/api-server:/app
+    networks:
+      - vietstore-network
+    restart: unless-stopped
+
   # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
@@ -162,7 +179,7 @@ services:
     image: prom/prometheus:latest
     container_name: vietstore-prometheus
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
