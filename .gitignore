@@ -58,8 +58,11 @@ htmlcov/
 *.h5
 *.pt
 *.pth
-models/
+/models/
 checkpoints/
+
+# Exception: source code models
+!apps/api-server/src/models/
 
 # Temporary files
 *.tmp
