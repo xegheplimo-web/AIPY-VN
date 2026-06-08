@@ -29,6 +29,7 @@ dependencies = [
     "sentry-sdk[fastapi]",
     "stripe",
     "googlesearch-python",
+    "slowapi>=0.1.9",
 ]
 
 [dependency-groups]
