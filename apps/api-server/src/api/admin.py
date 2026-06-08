@@ -1,13 +1,11 @@
-from typing import List, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlalchemy import select, func
-
+from sqlalchemy import func, select
 from src.database import async_session
-from src.models.store import Store, Product
-from src.models.user import User
 from src.models.order import Order
+from src.models.store import Product, Store
+from src.models.user import User
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
@@ -31,7 +29,7 @@ class MatchQueueItem(BaseModel):
 
 
 class MatchQueueResponse(BaseModel):
-    matches: List[MatchQueueItem]
+    matches: list[MatchQueueItem]
     total: int
 
 
@@ -45,12 +43,12 @@ class IndustryItem(BaseModel):
     id: str
     name: str
     slug: str
-    description: Optional[str] = None
+    description: str | None = None
     store_count: int
 
 
 class IndustryListResponse(BaseModel):
-    industries: List[IndustryItem]
+    industries: list[IndustryItem]
 
 
 @router.get("/stats", response_model=AdminStatsResponse)

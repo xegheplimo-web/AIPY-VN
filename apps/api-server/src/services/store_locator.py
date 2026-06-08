@@ -5,12 +5,12 @@ Lấy tọa độ & địa chỉ cửa hàng tại VN sử dụng OpenMap.vn (ư
 """
 
 import logging
-import time
 import math
-from typing import Optional, List, Dict, Any
-from dataclasses import dataclass, asdict
-import requests
+import time
+from dataclasses import asdict, dataclass
+from typing import Any
 
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +26,11 @@ class Store:
     city: str
     district: str
     ward: str
-    phone: Optional[str] = None
-    category: Optional[str] = None
-    opening_hours: Optional[str] = None
-    website: Optional[str] = None
-    osm_id: Optional[int] = None
+    phone: str | None = None
+    category: str | None = None
+    opening_hours: str | None = None
+    website: str | None = None
+    osm_id: int | None = None
 
 
 class VietnamStoreLocator:
@@ -67,7 +67,7 @@ class VietnamStoreLocator:
 
     async def _try_openmap_nearby(
         self, lat: float, lon: float, category: str, radius_km: float
-    ) -> List[Store]:
+    ) -> list[Store]:
         """Try OpenMap.vn first (priority for Vietnam data)."""
         if not self.use_openmap:
             return []
@@ -123,7 +123,7 @@ class VietnamStoreLocator:
 
     async def search_stores_by_name(
         self, query: str, city: str = "Hồ Chí Minh", limit: int = 50
-    ) -> List[Store]:
+    ) -> list[Store]:
         """
         Tìm cửa hàng theo tên.
 
@@ -206,7 +206,7 @@ class VietnamStoreLocator:
         category: str,
         city: str = "Hồ Chí Minh",
         radius_km: float = 10,
-    ) -> List[Store]:
+    ) -> list[Store]:
         """
         Tìm TẤT CẢ cửa hàng theo loại trong khu vực.
 
@@ -308,7 +308,7 @@ class VietnamStoreLocator:
         self,
         brand: str,
         city: str = "",
-    ) -> List[Store]:
+    ) -> list[Store]:
         """
         Tìm tất cả cửa hàng của một chuỗi.
 
@@ -391,7 +391,7 @@ class VietnamStoreLocator:
             logger.error(f"Error searching chain stores: {e}")
             return []
 
-    async def reverse_geocode(self, lat: float, lon: float) -> Dict[str, Any]:
+    async def reverse_geocode(self, lat: float, lon: float) -> dict[str, Any]:
         """
         Chuyển tọa độ thành địa chỉ đầy đủ.
 
@@ -451,7 +451,7 @@ class VietnamStoreLocator:
             logger.error(f"Error reverse geocoding: {e}")
             return {}
 
-    async def geocode_address(self, address: str) -> Optional[Dict[str, Any]]:
+    async def geocode_address(self, address: str) -> dict[str, Any] | None:
         """
         Chuyển địa chỉ thành tọa độ.
 
@@ -519,7 +519,7 @@ class VietnamStoreLocator:
         category: str = "convenience",
         radius_km: float = 2,
         limit: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Tìm cửa hàng gần nhất từ vị trí hiện tại.
 
@@ -552,7 +552,7 @@ class VietnamStoreLocator:
 
     def _search_nearby(
         self, lat: float, lon: float, category: str, radius_km: float
-    ) -> List[Store]:
+    ) -> list[Store]:
         """Tìm trực tiếp bằng tọa độ."""
         radius_m = radius_km * 1000
 
@@ -604,7 +604,7 @@ class VietnamStoreLocator:
             logger.error(f"Error searching nearby: {e}")
             return []
 
-    def _geocode_city(self, city: str) -> Optional[tuple[float, float]]:
+    def _geocode_city(self, city: str) -> tuple[float, float] | None:
         """Lấy tọa độ trung tâm thành phố."""
         city_coords = {
             "Hồ Chí Minh": (10.7769, 106.7009),

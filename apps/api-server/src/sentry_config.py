@@ -5,10 +5,11 @@ Initializes Sentry for error tracking and performance monitoring.
 """
 
 import logging
+
 from sentry_sdk import init as sentry_init
+from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.integrations.celery import CeleryIntegration
 from src.config import config
 
 logger = logging.getLogger(__name__)

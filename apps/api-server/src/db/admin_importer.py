@@ -6,11 +6,10 @@ from provinces.open-api.vn API.
 """
 
 import logging
-from typing import Optional
-import httpx
 
-from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +214,7 @@ class VietnamAdminImporter:
             await self.session.rollback()
             return 0
 
-    async def _geocode_nominatim(self, query: str) -> Optional[tuple[float, float]]:
+    async def _geocode_nominatim(self, query: str) -> tuple[float, float] | None:
         """
         Geocode using Nominatim (fallback).
         

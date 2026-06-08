@@ -1,14 +1,14 @@
-# -*- coding: utf-8 -*-
 import asyncio
-import uuid
-import sys
-import os
 import logging
+import os
+import sys
+import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 # Ensure UTF-8 encoding for stdout/stderr
 if sys.platform == "win32":
@@ -20,8 +20,8 @@ if sys.platform == "win32":
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.models.store import Store, Product, Category
 from src.config import config
+from src.models.store import Category, Product, Store
 
 logger = logging.getLogger(__name__)
 
@@ -228,8 +228,8 @@ async def seed_data():
                 shelf_location="A1-02",
                 category_id=cat_map["Thuốc & Dược phẩm"],
                 status="active",
-                created_at=datetime.now(timezone.utc).isoformat(),
-                updated_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
+                updated_at=datetime.now(UTC).isoformat(),
             ),
             Product(
                 id=uuid.uuid4(),
@@ -244,8 +244,8 @@ async def seed_data():
                 shelf_location="A2-05",
                 category_id=cat_map["Thực phẩm chức năng"],
                 status="active",
-                created_at=datetime.now(timezone.utc).isoformat(),
-                updated_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
+                updated_at=datetime.now(UTC).isoformat(),
             ),
             Product(
                 id=uuid.uuid4(),
@@ -260,8 +260,8 @@ async def seed_data():
                 shelf_location="B1-01",
                 category_id=cat_map["Thiết bị y tế"],
                 status="active",
-                created_at=datetime.now(timezone.utc).isoformat(),
-                updated_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
+                updated_at=datetime.now(UTC).isoformat(),
             ),
             Product(
                 id=uuid.uuid4(),
@@ -276,8 +276,8 @@ async def seed_data():
                 shelf_location="C3-10",
                 category_id=cat_map["Mỹ phẩm"],
                 status="active",
-                created_at=datetime.now(timezone.utc).isoformat(),
-                updated_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
+                updated_at=datetime.now(UTC).isoformat(),
             ),
             Product(
                 id=uuid.uuid4(),
@@ -292,8 +292,8 @@ async def seed_data():
                 shelf_location="D1-15",
                 category_id=cat_map["Thực phẩm"],
                 status="active",
-                created_at=datetime.now(timezone.utc).isoformat(),
-                updated_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
+                updated_at=datetime.now(UTC).isoformat(),
             ),
         ]
         session.add_all(products)

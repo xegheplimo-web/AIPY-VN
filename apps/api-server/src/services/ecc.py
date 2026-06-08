@@ -8,19 +8,20 @@ Provides:
 - Secure key generation and management
 """
 
-import os
-import json
 import base64
+import json
 import logging
-from typing import Optional, Dict, Any
-from datetime import datetime, timedelta, timezone
+import os
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import jwt
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.backends import default_backend
-from cryptography.exceptions import InvalidSignature
-import jwt
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class ECCService:
     # Use P-256 curve (NIST) for balance of security and performance
     CURVE = ec.SECP256R1()
 
-    def __init__(self, private_key_pem: Optional[str] = None):
+    def __init__(self, private_key_pem: str | None = None):
         """
         Initialize ECC service with optional existing private key.
 
@@ -93,7 +94,7 @@ class ECCService:
         self,
         signature: bytes,
         data: bytes,
-        public_key: Optional[ec.EllipticCurvePublicKey] = None,
+        public_key: ec.EllipticCurvePublicKey | None = None,
     ) -> bool:
         """
         Verify signature using ECDSA.
@@ -155,7 +156,7 @@ class ECCService:
         return hkdf.derive(shared_secret)
 
     @staticmethod
-    def encrypt_message(message: str, aes_key: bytes) -> Dict[str, str]:
+    def encrypt_message(message: str, aes_key: bytes) -> dict[str, str]:
         """
         Encrypt message using AES-GCM.
 
@@ -176,7 +177,7 @@ class ECCService:
         }
 
     @staticmethod
-    def decrypt_message(encrypted_data: Dict[str, str], aes_key: bytes) -> str:
+    def decrypt_message(encrypted_data: dict[str, str], aes_key: bytes) -> str:
         """
         Decrypt message using AES-GCM.
 
@@ -202,7 +203,7 @@ class JWTService:
         self.ecc = ecc_service
         self.algorithm = "ES256"  # ECDSA with SHA-256
 
-    def create_token(self, payload: Dict[str, Any], expires_in: int = 3600) -> str:
+    def create_token(self, payload: dict[str, Any], expires_in: int = 3600) -> str:
         """
         Create JWT token signed with ECDSA.
 
@@ -213,7 +214,7 @@ class JWTService:
         Returns:
             JWT token string
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Add standard claims
         token_payload = {
@@ -230,8 +231,8 @@ class JWTService:
         return token
 
     def verify_token(
-        self, token: str, public_key_pem: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, token: str, public_key_pem: str | None = None
+    ) -> dict[str, Any] | None:
         """
         Verify JWT token signature.
 
@@ -276,7 +277,7 @@ class APIRequestSigner:
             Base64-encoded signature
         """
         if timestamp is None:
-            timestamp = datetime.now(timezone.utc).isoformat()
+            timestamp = datetime.now(UTC).isoformat()
 
         # Create signature string
         signature_string = f"{method}:{path}:{body}:{timestamp}"
@@ -330,8 +331,8 @@ class E2EEncryptionService:
 
     def __init__(self, ecc_service: ECCService):
         self.ecc = ecc_service
-        self.session_keys: Dict[str, bytes] = {}  # session_id -> aes_key
-        self.session_expiry: Dict[str, float] = {}
+        self.session_keys: dict[str, bytes] = {}  # session_id -> aes_key
+        self.session_expiry: dict[str, float] = {}
 
     def generate_session_key(
         self, peer_public_key_pem: str, session_id: str, ttl_seconds: int = 3600
@@ -362,7 +363,7 @@ class E2EEncryptionService:
             # Store session key
             self.session_keys[session_id] = aes_key
             self.session_expiry[session_id] = (
-                datetime.now(timezone.utc).timestamp() + ttl_seconds
+                datetime.now(UTC).timestamp() + ttl_seconds
             )
 
             # Encrypt session key with peer's public key (simplified - in production use proper key wrapping)
@@ -375,7 +376,7 @@ class E2EEncryptionService:
             logger.error(f"Session key generation error: {e}", exc_info=True)
             raise
 
-    def encrypt_message(self, session_id: str, message: str) -> Dict[str, str]:
+    def encrypt_message(self, session_id: str, message: str) -> dict[str, str]:
         """
         Encrypt message for session.
 
@@ -394,7 +395,7 @@ class E2EEncryptionService:
 
             # Check expiry
             expiry = self.session_expiry.get(session_id, 0)
-            if datetime.now(timezone.utc).timestamp() > expiry:
+            if datetime.now(UTC).timestamp() > expiry:
                 del self.session_keys[session_id]
                 del self.session_expiry[session_id]
                 raise ValueError("Session expired")
@@ -406,7 +407,7 @@ class E2EEncryptionService:
             logger.error(f"Message encryption error: {e}", exc_info=True)
             raise
 
-    def decrypt_message(self, session_id: str, encrypted_data: Dict[str, str]) -> str:
+    def decrypt_message(self, session_id: str, encrypted_data: dict[str, str]) -> str:
         """
         Decrypt message from session.
 
@@ -425,7 +426,7 @@ class E2EEncryptionService:
 
             # Check expiry
             expiry = self.session_expiry.get(session_id, 0)
-            if datetime.now(timezone.utc).timestamp() > expiry:
+            if datetime.now(UTC).timestamp() > expiry:
                 del self.session_keys[session_id]
                 del self.session_expiry[session_id]
                 raise ValueError("Session expired")
@@ -439,7 +440,7 @@ class E2EEncryptionService:
 
     def cleanup_expired_sessions(self):
         """Remove expired sessions"""
-        now = datetime.now(timezone.utc).timestamp()
+        now = datetime.now(UTC).timestamp()
         expired = [sid for sid, exp in self.session_expiry.items() if exp < now]
         for sid in expired:
             self.session_keys.pop(sid, None)
@@ -449,13 +450,13 @@ class E2EEncryptionService:
 
 
 # Global service instances
-_ecc_service: Optional[ECCService] = None
-_jwt_service: Optional[JWTService] = None
-_request_signer: Optional[APIRequestSigner] = None
-_e2e_service: Optional[E2EEncryptionService] = None
+_ecc_service: ECCService | None = None
+_jwt_service: JWTService | None = None
+_request_signer: APIRequestSigner | None = None
+_e2e_service: E2EEncryptionService | None = None
 
 
-def init_ecc_service(private_key_pem: Optional[str] = None) -> None:
+def init_ecc_service(private_key_pem: str | None = None) -> None:
     """Initialize global ECC service instance"""
     global _ecc_service, _jwt_service, _request_signer, _e2e_service
 

@@ -5,15 +5,14 @@ Endpoints for managing user favorites/wishlist.
 """
 
 import logging
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
-
 from src.database import async_session
-from src.models.user import User
-from src.models.store import Product
 from src.middleware.auth_middleware import require_auth
+from src.models.store import Product
+from src.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +27,12 @@ class FavoriteResponse(BaseModel):
     product_id: str
     product_name: str
     product_price: float
-    product_image: Optional[str]
+    product_image: str | None
     store_id: str
     store_name: str
     created_at: str
     model_config = {"from_attributes": True}
-@router.get("", response_model=List[FavoriteResponse])
+@router.get("", response_model=list[FavoriteResponse])
 async def get_favorites(current_user: User = Depends(require_auth)):
     """
     Get all favorite products for the current user.

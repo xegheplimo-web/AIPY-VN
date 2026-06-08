@@ -1,15 +1,12 @@
 import uuid
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
-
+from sqlalchemy import func, select
 from src.database import async_session
-from src.models.store import Store, Product, Category
 from src.models.review import Review
-from src.utils.pagination import paginate, get_pagination_metadata
+from src.models.store import Category, Product, Store
+from src.utils.pagination import paginate
 from src.utils.uuid import safe_uuid
 
 router = APIRouter(prefix="/api/stores", tags=["Stores"])
@@ -21,19 +18,19 @@ class StoreListItem(BaseModel):
     address: str
     latitude: float
     longitude: float
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    logo_url: Optional[str] = None
-    industry: Optional[str] = None
-    is_open_now: Optional[bool] = None
-    rating: Optional[float] = None
-    total_reviews: Optional[int] = None
-    status: Optional[str] = None
+    phone: str | None = None
+    email: str | None = None
+    logo_url: str | None = None
+    industry: str | None = None
+    is_open_now: bool | None = None
+    rating: float | None = None
+    total_reviews: int | None = None
+    status: str | None = None
     model_config = {"from_attributes": True}
 
 
 class StoreListResponse(BaseModel):
-    stores: List[StoreListItem]
+    stores: list[StoreListItem]
     total: int
     page: int
     limit: int
@@ -45,39 +42,39 @@ class StoreDetailResponse(BaseModel):
     address: str
     latitude: float
     longitude: float
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    zalo: Optional[str] = None
-    logo_url: Optional[str] = None
-    cover_image_url: Optional[str] = None
-    images: Optional[List[str]] = None
-    business_hours: Optional[dict] = None
-    is_open_now: Optional[bool] = None
-    rating: Optional[float] = None
-    total_reviews: Optional[int] = None
-    industry: Optional[str] = None
-    status: Optional[str] = None
-    location_verified: Optional[bool] = None
+    phone: str | None = None
+    email: str | None = None
+    zalo: str | None = None
+    logo_url: str | None = None
+    cover_image_url: str | None = None
+    images: list[str] | None = None
+    business_hours: dict | None = None
+    is_open_now: bool | None = None
+    rating: float | None = None
+    total_reviews: int | None = None
+    industry: str | None = None
+    status: str | None = None
+    location_verified: bool | None = None
     products_count: int
-    average_rating: Optional[float] = None
+    average_rating: float | None = None
     model_config = {"from_attributes": True}
 
 
 class StoreProductItem(BaseModel):
     id: str
     name: str
-    description: Optional[str] = None
-    price: Optional[float] = None
-    stock: Optional[int] = None
-    unit: Optional[str] = None
-    images: Optional[List[str]] = None
-    shelf_location: Optional[str] = None
-    category_name: Optional[str] = None
+    description: str | None = None
+    price: float | None = None
+    stock: int | None = None
+    unit: str | None = None
+    images: list[str] | None = None
+    shelf_location: str | None = None
+    category_name: str | None = None
     model_config = {"from_attributes": True}
 
 
 class StoreProductsResponse(BaseModel):
-    products: List[StoreProductItem]
+    products: list[StoreProductItem]
     page: int
     limit: int
     total: int
@@ -88,10 +85,10 @@ class StoreRegisterRequest(BaseModel):
     address: str = Field(..., min_length=1)
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
-    phone: Optional[str] = Field(None, max_length=20)
-    email: Optional[str] = Field(None, max_length=255)
-    zalo: Optional[str] = Field(None, max_length=20)
-    industry: Optional[str] = Field(None, max_length=100)
+    phone: str | None = Field(None, max_length=20)
+    email: str | None = Field(None, max_length=255)
+    zalo: str | None = Field(None, max_length=20)
+    industry: str | None = Field(None, max_length=100)
 
 
 class StoreRegisterResponse(BaseModel):
@@ -111,9 +108,9 @@ class ValidateLocationResponse(BaseModel):
 
 @router.get("/", response_model=StoreListResponse)
 async def list_stores(
-    province: Optional[str] = None,
-    industry: Optional[str] = None,
-    is_open: Optional[bool] = None,
+    province: str | None = None,
+    industry: str | None = None,
+    is_open: bool | None = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
 ):

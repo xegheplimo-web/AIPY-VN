@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from sqlalchemy.exc import SQLAlchemyError
-import traceback
 import logging
+import traceback
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
     """Handle database errors without exposing internal details."""
     request_id = getattr(request.state, "request_id", None)
-    logger.error(f"Database error [{request_id}]: {str(exc)}")
+    logger.error(f"Database error [{request_id}]: {exc!s}")
     return JSONResponse(
         status_code=500,
         content={

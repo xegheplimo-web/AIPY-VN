@@ -1,5 +1,6 @@
 import os
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
 DATABASE_URL = os.getenv(
@@ -12,22 +13,6 @@ async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit
 Base = declarative_base()
 
 # Import all models to ensure they're registered with Base
-from src.models import (
-    User,
-    Address,
-    Store,
-    Product,
-    Category,
-    Cart,
-    CartItem,
-    Order,
-    OrderItem,
-    ProductVariant,
-    Review,
-    ChatMessage,
-    Promotion,
-    Report,
-)
 
 
 async def init_db():

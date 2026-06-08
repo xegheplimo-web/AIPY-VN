@@ -4,10 +4,11 @@ Audit Logging Utility
 Provides structured logging for security-relevant events.
 """
 
-import logging
 import json
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+import logging
+from datetime import UTC, datetime
+from typing import Any
+
 from fastapi import Request
 
 logger = logging.getLogger(__name__)
@@ -19,12 +20,12 @@ class AuditLogger:
     @staticmethod
     def log_event(
         event_type: str,
-        user_id: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        resource: Optional[str] = None,
-        action: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        user_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        resource: str | None = None,
+        action: str | None = None,
+        details: dict[str, Any] | None = None,
         success: bool = True,
     ):
         """
@@ -41,7 +42,7 @@ class AuditLogger:
             success: Whether the operation succeeded
         """
         audit_data = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "event_type": event_type,
             "user_id": user_id,
             "ip_address": ip_address,
@@ -84,7 +85,7 @@ class AuditLogger:
         resource: str,
         action: str,
         ip_address: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         """Log permission denied event."""
         AuditLogger.log_event(
@@ -103,7 +104,7 @@ class AuditLogger:
         resource: str,
         action: str,
         ip_address: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         """Log data access event."""
         AuditLogger.log_event(
@@ -121,7 +122,7 @@ class AuditLogger:
         resource: str,
         action: str,
         ip_address: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         """Log data modification event."""
         AuditLogger.log_event(

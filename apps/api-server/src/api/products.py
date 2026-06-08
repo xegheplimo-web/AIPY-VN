@@ -1,13 +1,11 @@
 import uuid
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-
 from src.database import async_session
-from src.models.store import Store, Product, Category
+from src.models.store import Category, Product, Store
 
 router = APIRouter(prefix="/api/products", tags=["Products"])
 
@@ -16,7 +14,7 @@ class StoreInfo(BaseModel):
     id: str
     name: str
     address: str
-    phone: Optional[str] = None
+    phone: str | None = None
     latitude: float
     longitude: float
     model_config = {"from_attributes": True}
@@ -25,18 +23,18 @@ class StoreInfo(BaseModel):
 class ProductDetailResponse(BaseModel):
     id: str
     name: str
-    description: Optional[str] = None
-    price: Optional[float] = None
-    stock: Optional[int] = None
-    unit: Optional[str] = None
-    weight_grams: Optional[int] = None
-    dimensions: Optional[dict] = None
-    barcode: Optional[str] = None
-    brand: Optional[str] = None
-    images: Optional[List[str]] = None
-    shelf_location: Optional[str] = None
-    category_name: Optional[str] = None
-    status: Optional[str] = None
+    description: str | None = None
+    price: float | None = None
+    stock: int | None = None
+    unit: str | None = None
+    weight_grams: int | None = None
+    dimensions: dict | None = None
+    barcode: str | None = None
+    brand: str | None = None
+    images: list[str] | None = None
+    shelf_location: str | None = None
+    category_name: str | None = None
+    status: str | None = None
     store: StoreInfo
     model_config = {"from_attributes": True}
 
@@ -44,14 +42,14 @@ class ProductDetailResponse(BaseModel):
 class AlternativeProductItem(BaseModel):
     id: str
     name: str
-    price: Optional[float] = None
-    stock: Optional[int] = None
-    store_name: Optional[str] = None
+    price: float | None = None
+    stock: int | None = None
+    store_name: str | None = None
     model_config = {"from_attributes": True}
 
 
 class AlternativesResponse(BaseModel):
-    alternatives: List[AlternativeProductItem]
+    alternatives: list[AlternativeProductItem]
 
 
 @router.get("/{product_id}", response_model=ProductDetailResponse)

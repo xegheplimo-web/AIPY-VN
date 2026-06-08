@@ -7,7 +7,6 @@ For production Vietnamese: paraphrase-multilingual-MiniLM-L12-v2
 """
 
 import os
-from typing import List
 
 # SentenceTransformers (install via: uv add sentence-transformers)
 try:
@@ -38,7 +37,7 @@ class EmbeddingService:
             print(f"WARNING: Could not load embedding model: {e}")
             self.model = None
 
-    def encode(self, text: str) -> List[float]:
+    def encode(self, text: str) -> list[float]:
         """Generate embedding vector for a single text."""
         if not self.model:
             return []
@@ -49,7 +48,7 @@ class EmbeddingService:
             print(f"ERROR: Embedding failed: {e}")
             return []
 
-    def encode_batch(self, texts: List[str]) -> List[List[float]]:
+    def encode_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts."""
         if not self.model:
             return []

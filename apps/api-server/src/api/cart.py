@@ -1,13 +1,11 @@
 import uuid
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
-
 from src.database import async_session
-from src.models.store import Product
 from src.models.order import Cart, CartItem
+from src.models.store import Product
 
 router = APIRouter(prefix="/api/cart", tags=["Cart"])
 
@@ -18,7 +16,7 @@ class CartProductInfo(BaseModel):
     price: float
     stock: int
     unit: str
-    images: Optional[List[str]] = None
+    images: list[str] | None = None
     model_config = {"from_attributes": True}
 
 
@@ -33,8 +31,8 @@ class CartItemResponse(BaseModel):
 
 class CartResponse(BaseModel):
     cart_id: str
-    store_id: Optional[str] = None
-    items: List[CartItemResponse]
+    store_id: str | None = None
+    items: list[CartItemResponse]
     total_items: int
     total_amount: float
 
@@ -67,7 +65,7 @@ class RemoveCartItemResponse(BaseModel):
 
 
 @router.get("/", response_model=CartResponse)
-async def get_cart(user_id: Optional[str] = None):
+async def get_cart(user_id: str | None = None):
     async with async_session() as session:
         # For now, get the active cart (in real app, filter by user_id)
         cart_stmt = select(Cart).where(Cart.status == "active")
@@ -127,7 +125,7 @@ async def get_cart(user_id: Optional[str] = None):
 
 
 @router.post("/items", response_model=AddCartItemResponse)
-async def add_to_cart(data: AddCartItemRequest, user_id: Optional[str] = None):
+async def add_to_cart(data: AddCartItemRequest, user_id: str | None = None):
     async with async_session() as session:
         # Get product
         product_stmt = select(Product).where(Product.id == uuid.UUID(data.product_id))

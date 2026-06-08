@@ -5,7 +5,8 @@ Endpoints for finding stores using OpenStreetMap (free, no API key required).
 """
 
 import logging
-from fastapi import APIRouter, Query, HTTPException
+
+from fastapi import APIRouter, HTTPException, Query
 from src.services.store_locator import get_store_locator
 
 logger = logging.getLogger(__name__)

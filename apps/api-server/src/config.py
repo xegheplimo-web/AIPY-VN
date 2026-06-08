@@ -4,7 +4,7 @@ Configuration validation and management.
 Validates required environment variables and provides configuration access.
 """
 
-from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -38,7 +38,7 @@ class QdrantConfig(BaseModel):
     """Qdrant vector database configuration."""
 
     url: str = Field(default="http://localhost:6333")
-    api_key: Optional[str] = Field(default=None)
+    api_key: str | None = Field(default=None)
     collection: str = Field(default="vietstore_products")
     vector_size: int = Field(default=384)
 
@@ -46,7 +46,7 @@ class QdrantConfig(BaseModel):
 class ECCConfig(BaseModel):
     """ECC cryptography configuration."""
 
-    private_key_pem: Optional[str] = Field(default=None, alias="ECC_PRIVATE_KEY_PEM")
+    private_key_pem: str | None = Field(default=None, alias="ECC_PRIVATE_KEY_PEM")
 
     @field_validator("private_key_pem")
     def validate_ecc_key(cls, v):
@@ -58,7 +58,7 @@ class ECCConfig(BaseModel):
 class OllamaConfig(BaseModel):
     """Ollama cloud configuration."""
 
-    cloud_api_key: Optional[str] = Field(default=None, alias="OLLAMA_CLOUD_API_KEY")
+    cloud_api_key: str | None = Field(default=None, alias="OLLAMA_CLOUD_API_KEY")
     cloud_url: str = Field(default="https://api.ollama.com", alias="OLLAMA_CLOUD_URL")
     default_model: str = Field(default="qwen3.5:cloud", alias="OLLAMA_DEFAULT_MODEL")
     cloud_models: str = Field(

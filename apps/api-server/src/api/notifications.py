@@ -5,16 +5,14 @@ Endpoints for managing push notifications and device tokens.
 """
 
 import logging
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
-from sqlalchemy.orm import selectinload
-
 from src.database import async_session
+from src.middleware.auth_middleware import require_auth
 from src.models.user import User
 from src.services.firebase import get_firebase_service
-from src.middleware.auth_middleware import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +31,8 @@ class SendNotificationRequest(BaseModel):
 
     title: str = Field(..., description="Notification title")
     body: str = Field(..., description="Notification body")
-    data: Optional[dict] = Field(default=None, description="Custom data payload")
-    user_ids: Optional[List[str]] = Field(default=None, description="Target user IDs")
+    data: dict | None = Field(default=None, description="Custom data payload")
+    user_ids: list[str] | None = Field(default=None, description="Target user IDs")
 
 
 class NotificationResponse(BaseModel):
@@ -42,7 +40,7 @@ class NotificationResponse(BaseModel):
 
     success: bool
     message: str
-    data: Optional[dict] = None
+    data: dict | None = None
 
 
 @router.post("/register", response_model=NotificationResponse)
@@ -74,7 +72,7 @@ async def register_device(
         logger.error(f"Failed to register device token: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to register device token: {str(e)}"
+            detail=f"Failed to register device token: {e!s}"
         )
 
 
@@ -138,7 +136,7 @@ async def send_notification(
         logger.error(f"Failed to send notification: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to send notification: {str(e)}"
+            detail=f"Failed to send notification: {e!s}"
         )
 
 
@@ -183,5 +181,5 @@ async def test_notification(
         logger.error(f"Failed to send test notification: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to send test notification: {str(e)}"
+            detail=f"Failed to send test notification: {e!s}"
         )

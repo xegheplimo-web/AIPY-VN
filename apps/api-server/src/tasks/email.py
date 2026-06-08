@@ -5,6 +5,7 @@ Background tasks for sending emails.
 """
 
 import logging
+
 from src.celery_app import celery_app
 
 logger = logging.getLogger(__name__)

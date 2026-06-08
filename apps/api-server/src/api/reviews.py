@@ -5,17 +5,16 @@ Endpoints for managing store and product reviews.
 """
 
 import logging
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
-from sqlalchemy import select, and_
-from sqlalchemy.orm import selectinload
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, select
+from sqlalchemy.orm import selectinload
 from src.database import async_session
-from src.models.user import User
-from src.models.store import Store, Product
 from src.middleware.auth_middleware import require_auth
 from src.models.review import Review
+from src.models.store import Product, Store
+from src.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +26,8 @@ class ReviewRequest(BaseModel):
 
     rating: int = Field(..., ge=1, le=5, description="Rating from 1 to 5 stars")
     comment: str = Field(..., min_length=1, max_length=1000, description="Review comment")
-    store_id: Optional[str] = Field(None, description="Store ID (for store reviews)")
-    product_id: Optional[str] = Field(None, description="Product ID (for product reviews)")
+    store_id: str | None = Field(None, description="Store ID (for store reviews)")
+    product_id: str | None = Field(None, description="Product ID (for product reviews)")
 
 
 class ReviewResponse(BaseModel):
@@ -36,22 +35,22 @@ class ReviewResponse(BaseModel):
 
     id: str
     user_id: str
-    user_name: Optional[str]
-    store_id: Optional[str]
-    product_id: Optional[str]
+    user_name: str | None
+    store_id: str | None
+    product_id: str | None
     rating: int
     comment: str
     created_at: str
-    updated_at: Optional[str]
+    updated_at: str | None
     model_config = {"from_attributes": True}
 
 
 class ReviewListResponse(BaseModel):
     """Response model for review list."""
 
-    reviews: List[ReviewResponse]
+    reviews: list[ReviewResponse]
     total: int
-    average_rating: Optional[float]
+    average_rating: float | None
 
 
 @router.post("", response_model=ReviewResponse, status_code=201)

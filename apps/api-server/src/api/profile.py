@@ -5,14 +5,13 @@ Endpoints for managing user profile information.
 """
 
 import logging
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
-from pydantic import BaseModel, Field, EmailStr
-from sqlalchemy import select, and_
 
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import and_, select
 from src.database import async_session
-from src.models.user import User, Address
-from src.middleware.auth_middleware import get_current_user, require_auth
+from src.middleware.auth_middleware import require_auth
+from src.models.user import Address, User
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +21,10 @@ router = APIRouter(prefix="/api/users/me", tags=["User Profile"])
 class ProfileUpdateRequest(BaseModel):
     """Request to update user profile."""
 
-    full_name: Optional[str] = Field(None, max_length=100)
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = Field(None, pattern=r"^(\+84|0)[0-9]{9,10}$")
-    avatar_url: Optional[str] = None
+    full_name: str | None = Field(None, max_length=100)
+    email: EmailStr | None = None
+    phone: str | None = Field(None, pattern=r"^(\+84|0)[0-9]{9,10}$")
+    avatar_url: str | None = None
 
 
 class ProfileResponse(BaseModel):
@@ -33,14 +32,14 @@ class ProfileResponse(BaseModel):
 
     id: str
     email: str
-    phone: Optional[str]
-    full_name: Optional[str]
-    avatar_url: Optional[str]
+    phone: str | None
+    full_name: str | None
+    avatar_url: str | None
     role: str
     is_verified: bool
     is_active: bool
     created_at: str
-    updated_at: Optional[str]
+    updated_at: str | None
     model_config = {"from_attributes": True}
 
 
@@ -52,11 +51,11 @@ class AddressRequest(BaseModel):
     address_line: str = Field(..., max_length=255)
     city: str = Field(..., max_length=100)
     district: str = Field(..., max_length=100)
-    ward: Optional[str] = Field(None, max_length=100)
-    postal_code: Optional[str] = Field(None, max_length=20)
+    ward: str | None = Field(None, max_length=100)
+    postal_code: str | None = Field(None, max_length=20)
     is_default: bool = False
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class AddressResponse(BaseModel):
@@ -69,13 +68,13 @@ class AddressResponse(BaseModel):
     address_line: str
     city: str
     district: str
-    ward: Optional[str]
-    postal_code: Optional[str]
+    ward: str | None
+    postal_code: str | None
     is_default: bool
-    latitude: Optional[float]
-    longitude: Optional[float]
+    latitude: float | None
+    longitude: float | None
     created_at: str
-    updated_at: Optional[str]
+    updated_at: str | None
     model_config = {"from_attributes": True}
 @router.get("/profile", response_model=ProfileResponse)
 async def get_profile(current_user: User = Depends(require_auth)):
@@ -165,7 +164,7 @@ async def upload_avatar(
     return {"avatar_url": avatar_url, "message": "Avatar uploaded successfully"}
 
 
-@router.get("/addresses", response_model=List[AddressResponse])
+@router.get("/addresses", response_model=list[AddressResponse])
 async def get_addresses(current_user: User = Depends(require_auth)):
     """Get all addresses for the current user."""
     async with async_session() as session:
@@ -212,7 +211,7 @@ async def create_address(
         # If setting as default, unset other default addresses
         if data.is_default:
             update_query = select(Address).where(
-                and_(Address.user_id == current_user.id, Address.is_default == True)
+                and_(Address.user_id == current_user.id, Address.is_default)
             )
             result = await session.execute(update_query)
             default_addresses = result.scalars().all()
@@ -287,7 +286,7 @@ async def update_address(
                 and_(
                     Address.user_id == current_user.id,
                     Address.id != address_id,
-                    Address.is_default == True,
+                    Address.is_default,
                 )
             )
             result = await session.execute(update_query)
@@ -414,7 +413,7 @@ async def set_default_address(
             and_(
                 Address.user_id == current_user.id,
                 Address.id != address_id,
-                Address.is_default == True,
+                Address.is_default,
             )
         )
         result = await session.execute(update_query)

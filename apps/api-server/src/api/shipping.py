@@ -1,6 +1,5 @@
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-
 from src.services.geo import calculate_shipping_fee
 
 router = APIRouter(prefix="/api/shipping", tags=["Shipping"])

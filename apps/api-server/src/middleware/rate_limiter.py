@@ -1,9 +1,10 @@
-import time
 import logging
+import time
+
 from fastapi import Request
+from src.cache import cache
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-from src.cache import cache
 
 logger = logging.getLogger(__name__)
 

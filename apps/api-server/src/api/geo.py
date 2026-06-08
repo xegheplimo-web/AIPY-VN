@@ -5,13 +5,12 @@ Provides REST API endpoints for geo search using PostGIS.
 """
 
 import logging
-from fastapi import APIRouter, Query, Depends, HTTPException
-from typing import Optional
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
-from src.services.geo_search import GeoSearchService
 from src.services.geo_cache import GeoCacheService, get_geo_cache
+from src.services.geo_search import GeoSearchService
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +26,11 @@ async def get_geo_service(session: AsyncSession = Depends(get_db)) -> GeoSearchS
 @router.get("/search")
 async def search_stores(
     q: str = Query(..., min_length=1, description="Từ khóa tìm kiếm"),
-    lat: Optional[float] = Query(None, description="Latitude"),
-    lng: Optional[float] = Query(None, description="Longitude"),
+    lat: float | None = Query(None, description="Latitude"),
+    lng: float | None = Query(None, description="Longitude"),
     radius: float = Query(50, description="Bán kính (km)"),
-    category: Optional[str] = Query(None, description="Slug danh mục"),
-    brand: Optional[str] = Query(None, description="Slug thương hiệu"),
+    category: str | None = Query(None, description="Slug danh mục"),
+    brand: str | None = Query(None, description="Slug thương hiệu"),
     limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
     svc: GeoSearchService = Depends(get_geo_service),
@@ -64,8 +63,8 @@ async def find_nearby(
     lat: float = Query(..., description="Latitude"),
     lng: float = Query(..., description="Longitude"),
     radius: float = Query(5, description="Bán kính (km)"),
-    category: Optional[str] = Query(None),
-    brand: Optional[str] = Query(None),
+    category: str | None = Query(None),
+    brand: str | None = Query(None),
     limit: int = Query(20, le=100),
     svc: GeoSearchService = Depends(get_geo_service),
 ):
@@ -123,7 +122,7 @@ async def list_categories(
 
 @router.get("/brands")
 async def list_brands(
-    category: Optional[str] = Query(None),
+    category: str | None = Query(None),
     svc: GeoSearchService = Depends(get_geo_service),
 ):
     """📋 Danh sách thương hiệu."""
@@ -133,8 +132,8 @@ async def list_brands(
 @router.get("/autocomplete")
 async def autocomplete(
     q: str = Query(..., min_length=1),
-    lat: Optional[float] = Query(None),
-    lng: Optional[float] = Query(None),
+    lat: float | None = Query(None),
+    lng: float | None = Query(None),
     limit: int = Query(8, le=20),
     svc: GeoSearchService = Depends(get_geo_service),
 ):

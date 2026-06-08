@@ -4,13 +4,13 @@ CSRF Protection Middleware
 Provides CSRF protection for state-changing requests.
 """
 
+import hashlib
 import logging
-from typing import Optional
+import secrets
+
 from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-import secrets
-import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         "/api/products",
     }
 
-    def __init__(self, app, secret_key: Optional[str] = None):
+    def __init__(self, app, secret_key: str | None = None):
         super().__init__(app)
         self.secret_key = secret_key or secrets.token_urlsafe(32)
         logger.info("CSRF middleware initialized")

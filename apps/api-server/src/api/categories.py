@@ -5,14 +5,13 @@ Endpoints for managing product categories.
 """
 
 import logging
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
-from sqlalchemy import select, and_
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, select
 from src.database import async_session
+from src.middleware.auth_middleware import require_admin
 from src.models.store import Category
-from src.middleware.auth_middleware import require_auth, require_admin
 from src.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -24,9 +23,9 @@ class CategoryRequest(BaseModel):
     """Request to create or update a category."""
 
     name: str = Field(..., min_length=1, max_length=100)
-    slug: Optional[str] = Field(None, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    icon: Optional[str] = None
+    slug: str | None = Field(None, max_length=100)
+    description: str | None = Field(None, max_length=500)
+    icon: str | None = None
     is_active: bool = True
 
 
@@ -35,14 +34,14 @@ class CategoryResponse(BaseModel):
 
     id: str
     name: str
-    slug: Optional[str]
-    description: Optional[str]
-    icon: Optional[str]
+    slug: str | None
+    description: str | None
+    icon: str | None
     is_active: bool
     created_at: str
-    updated_at: Optional[str]
+    updated_at: str | None
     model_config = {"from_attributes": True}
-@router.get("", response_model=List[CategoryResponse])
+@router.get("", response_model=list[CategoryResponse])
 async def get_categories(
     skip: int = 0,
     limit: int = 50,
@@ -58,7 +57,7 @@ async def get_categories(
         query = select(Category)
 
         if active_only:
-            query = query.where(Category.is_active == True)
+            query = query.where(Category.is_active)
 
         query = query.order_by(Category.name).offset(skip).limit(limit)
         result = await session.execute(query)

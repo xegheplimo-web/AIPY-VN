@@ -1,14 +1,12 @@
-import uuid
-import io
 import csv
-from typing import List, Optional
+import io
+import uuid
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, delete
-
+from sqlalchemy import func, select
 from src.database import async_session
-from src.models.store import Product, Store, Category
+from src.models.store import Product, Store
 
 router = APIRouter(prefix="/api/owner", tags=["Owner"])
 
@@ -16,20 +14,20 @@ router = APIRouter(prefix="/api/owner", tags=["Owner"])
 class OwnerProductItem(BaseModel):
     id: str
     name: str
-    description: Optional[str] = None
-    price: Optional[float] = None
+    description: str | None = None
+    price: float | None = None
     stock: int
     unit: str
-    barcode: Optional[str] = None
-    brand: Optional[str] = None
-    shelf_location: Optional[str] = None
+    barcode: str | None = None
+    brand: str | None = None
+    shelf_location: str | None = None
     status: str
-    created_at: Optional[str] = None
+    created_at: str | None = None
     model_config = {"from_attributes": True}
 
 
 class OwnerProductListResponse(BaseModel):
-    products: List[OwnerProductItem]
+    products: list[OwnerProductItem]
     total: int
     page: int
     limit: int
@@ -37,32 +35,32 @@ class OwnerProductListResponse(BaseModel):
 
 class CreateProductRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
+    description: str | None = None
     price: float = Field(..., ge=0)
     stock: int = Field(default=0, ge=0)
     unit: str = Field(default="cai")
-    weight_grams: Optional[int] = None
-    barcode: Optional[str] = None
-    brand: Optional[str] = None
-    shelf_location: Optional[str] = None
-    category_id: Optional[str] = None
+    weight_grams: int | None = None
+    barcode: str | None = None
+    brand: str | None = None
+    shelf_location: str | None = None
+    category_id: str | None = None
 
 
 class UpdateProductRequest(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = None
-    price: Optional[float] = Field(None, ge=0)
-    stock: Optional[int] = Field(None, ge=0)
-    unit: Optional[str] = None
-    barcode: Optional[str] = None
-    brand: Optional[str] = None
-    shelf_location: Optional[str] = None
-    status: Optional[str] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = None
+    price: float | None = Field(None, ge=0)
+    stock: int | None = Field(None, ge=0)
+    unit: str | None = None
+    barcode: str | None = None
+    brand: str | None = None
+    shelf_location: str | None = None
+    status: str | None = None
 
 
 class BulkUploadResponse(BaseModel):
     uploaded: int
-    errors: List[str]
+    errors: list[str]
     message: str
 
 
@@ -79,7 +77,7 @@ async def owner_list_products(
     store_id: str,
     page: int = 1,
     limit: int = 20,
-    search: Optional[str] = None,
+    search: str | None = None,
 ):
     async with async_session() as session:
         # Verify store exists
@@ -271,7 +269,7 @@ async def owner_bulk_upload(store_id: str, file: UploadFile = File(...)):
                 uploaded += 1
 
             except Exception as e:
-                errors.append(f"Row {row_num}: {str(e)}")
+                errors.append(f"Row {row_num}: {e!s}")
 
         await session.commit()
 

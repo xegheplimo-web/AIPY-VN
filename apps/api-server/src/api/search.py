@@ -1,11 +1,9 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import List, Optional
 import re
 
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-
 from src.database import async_session
 from src.models.store import Product
 from src.services.geo import haversine_distance
@@ -23,7 +21,7 @@ def sanitize_search_term(term: str) -> str:
 
 class ChatSearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Cau hoi/tu khoa tim kiem")
-    location: Optional[dict] = Field(None, description={"lat": float, "lng": float})
+    location: dict | None = Field(None, description={"lat": float, "lng": float})
     radius_km: float = Field(default=5.0, ge=0.1, le=50.0)
     limit: int = Field(default=10, ge=1, le=50)
 
@@ -31,11 +29,11 @@ class ChatSearchRequest(BaseModel):
 class ProductResult(BaseModel):
     id: str
     name: str
-    price: Optional[float]
-    stock: Optional[int]
+    price: float | None
+    stock: int | None
     in_stock: bool
     shelf_location: str
-    category: Optional[str]
+    category: str | None
 
 
 class StoreResult(BaseModel):
@@ -44,15 +42,15 @@ class StoreResult(BaseModel):
     address: str
     latitude: float
     longitude: float
-    distance_m: Optional[float]
-    industry: Optional[str]
-    products: List[ProductResult]
+    distance_m: float | None
+    industry: str | None
+    products: list[ProductResult]
     map_url: str
 
 
 class ChatSearchResponse(BaseModel):
     summary: str
-    stores: List[StoreResult]
+    stores: list[StoreResult]
     total_found: int
 
 

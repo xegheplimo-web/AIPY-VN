@@ -5,14 +5,13 @@ Supports Qdrant (recommended) or Typesense.
 In production, configure via environment variables.
 """
 
-import os
 import logging
-from typing import List, Optional
+import os
 
 # Qdrant client (install via: uv add qdrant-client)
 try:
     from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, VectorParams, PointStruct
+    from qdrant_client.models import Distance, PointStruct, VectorParams
 
     QDRANT_AVAILABLE = True
 except ImportError:
@@ -65,7 +64,7 @@ class VectorDBClient:
     def upsert_product(
         self,
         product_id: str,
-        vector: List[float],
+        vector: list[float],
         payload: dict,
     ) -> bool:
         """Insert or update a product vector."""
@@ -83,10 +82,10 @@ class VectorDBClient:
 
     def search(
         self,
-        query_vector: List[float],
+        query_vector: list[float],
         limit: int = 10,
-        filters: Optional[dict] = None,
-    ) -> List[dict]:
+        filters: dict | None = None,
+    ) -> list[dict]:
         """Search products by vector similarity."""
         if not self.client:
             return []

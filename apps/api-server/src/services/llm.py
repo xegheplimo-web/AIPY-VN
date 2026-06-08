@@ -5,7 +5,6 @@ Provides interface to Ollama cloud API for LLM inference.
 """
 
 import logging
-from typing import Optional, List, Dict
 
 try:
     import httpx
@@ -40,10 +39,10 @@ class OllamaCloudService:
     async def generate(
         self,
         prompt: str,
-        model: Optional[str] = None,
+        model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 1000,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         **kwargs,
     ) -> str:
         """
@@ -122,8 +121,8 @@ class OllamaCloudService:
 
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
+        messages: list[dict[str, str]],
+        model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 1000,
         **kwargs,
@@ -198,7 +197,7 @@ class OllamaCloudService:
             logger.error(f"Error calling Ollama Cloud API: {e}")
             raise
 
-    async def list_models(self) -> List[str]:
+    async def list_models(self) -> list[str]:
         """
         List available models from Ollama Cloud.
 
@@ -226,7 +225,7 @@ class OllamaCloudService:
             logger.error(f"Error listing models: {e}")
             return self.available_models
 
-    def get_available_models(self) -> List[str]:
+    def get_available_models(self) -> list[str]:
         """
         Get list of available models (sync wrapper).
 

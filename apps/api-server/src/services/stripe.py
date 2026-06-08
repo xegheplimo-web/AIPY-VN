@@ -5,7 +5,7 @@ Provides payment processing functionality using Stripe.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
 
 try:
     from stripe import StripeClient
@@ -52,9 +52,9 @@ class StripeService:
     async def create_payment_intent(
         self,
         amount: int,
-        currency: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        currency: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """
         Create a payment intent.
 
@@ -93,7 +93,7 @@ class StripeService:
 
     async def confirm_payment(
         self, payment_intent_id: str, payment_method_id: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Confirm a payment.
 
@@ -127,9 +127,9 @@ class StripeService:
     async def create_customer(
         self,
         email: str,
-        name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """
         Create a Stripe customer.
 
@@ -163,7 +163,7 @@ class StripeService:
 
     async def get_payment_intent(
         self, payment_intent_id: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Get payment intent details.
 
@@ -193,8 +193,8 @@ class StripeService:
             return None
 
     async def refund_payment(
-        self, payment_intent_id: str, amount: Optional[int] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, payment_intent_id: str, amount: int | None = None
+    ) -> dict[str, Any] | None:
         """
         Refund a payment.
 

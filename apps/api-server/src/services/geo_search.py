@@ -6,10 +6,10 @@ without depending on external APIs like Google Maps or OpenStreetMap.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+from typing import Any
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.services.geo_cache import GeoCacheService, get_geo_cache
 
 logger = logging.getLogger(__name__)
@@ -28,21 +28,21 @@ class GeoSearchService:
     - Redis caching for performance
     """
 
-    def __init__(self, session: AsyncSession, cache: Optional[GeoCacheService] = None):
+    def __init__(self, session: AsyncSession, cache: GeoCacheService | None = None):
         self.session = session
         self.cache = cache or get_geo_cache()
 
     async def search(
         self,
         query: str,
-        lat: Optional[float] = None,
-        lng: Optional[float] = None,
+        lat: float | None = None,
+        lng: float | None = None,
         radius_km: float = 50,
-        category: Optional[str] = None,
-        brand: Optional[str] = None,
+        category: str | None = None,
+        brand: str | None = None,
         limit: int = 20,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Intelligent search with full-text, fuzzy, and spatial filtering.
 
@@ -269,10 +269,10 @@ class GeoSearchService:
         lat: float,
         lng: float,
         radius_km: float = 5,
-        category: Optional[str] = None,
-        brand: Optional[str] = None,
+        category: str | None = None,
+        brand: str | None = None,
         limit: int = 20,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Find stores near a location using PostGIS spatial query.
 
@@ -372,7 +372,7 @@ class GeoSearchService:
                 "error": str(e),
             }
 
-    async def geocode(self, address: str) -> Dict[str, Any]:
+    async def geocode(self, address: str) -> dict[str, Any]:
         """
         Geocode address to coordinates using Vietnam admin data.
 
@@ -422,7 +422,7 @@ class GeoSearchService:
                 "error": str(e),
             }
 
-    async def reverse_geocode(self, lat: float, lng: float) -> Dict[str, Any]:
+    async def reverse_geocode(self, lat: float, lng: float) -> dict[str, Any]:
         """
         Reverse geocode coordinates to address.
 
@@ -518,7 +518,7 @@ class GeoSearchService:
                 "error": str(e),
             }
 
-    async def get_categories(self) -> List[Dict[str, Any]]:
+    async def get_categories(self) -> list[dict[str, Any]]:
         """Get all store categories with store counts."""
         # Check cache first
         cached = await self.cache.get_categories()
@@ -549,7 +549,7 @@ class GeoSearchService:
             logger.error(f"Get categories error: {e}")
             return []
 
-    async def get_brands(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_brands(self, category: str | None = None) -> list[dict[str, Any]]:
         """Get all brands with store counts."""
         # Check cache first
         cached = await self.cache.get_brands(category)
@@ -588,7 +588,7 @@ class GeoSearchService:
             return []
 
     @staticmethod
-    def _format_distance(meters: Optional[float]) -> Optional[str]:
+    def _format_distance(meters: float | None) -> str | None:
         """Format distance in meters to human-readable string."""
         if meters is None:
             return None

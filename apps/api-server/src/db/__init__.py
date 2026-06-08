@@ -2,21 +2,21 @@
 Database module initialization.
 """
 
-from .postgis import PostGISManager, setup_postgis
+from ..database import Base, async_session, engine, get_db, init_db
 from .admin_importer import VietnamAdminImporter, import_admin_data
 from .osm_importer import OSMImporter, import_osm_data
-from ..database import async_session, engine, Base, get_db, init_db
+from .postgis import PostGISManager, setup_postgis
 
 __all__ = [
-    "PostGISManager",
-    "setup_postgis",
-    "VietnamAdminImporter",
-    "import_admin_data",
+    "Base",
     "OSMImporter",
-    "import_osm_data",
+    "PostGISManager",
+    "VietnamAdminImporter",
     "async_session",
     "engine",
-    "Base",
     "get_db",
+    "import_admin_data",
+    "import_osm_data",
     "init_db",
+    "setup_postgis",
 ]

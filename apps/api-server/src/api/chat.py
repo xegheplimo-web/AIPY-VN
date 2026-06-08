@@ -1,31 +1,27 @@
-import uuid
 import base64
 import logging
-from typing import List, Optional, Dict
+import uuid
 from datetime import datetime
 
 from fastapi import (
     APIRouter,
-    WebSocket,
-    HTTPException,
     Depends,
-    WebSocketDisconnect,
-    UploadFile,
     File,
+    HTTPException,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
 )
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
-
+from sqlalchemy import func, select
+from src.agents import get_shopping_agent
 from src.database import async_session
+from src.middleware.auth_middleware import require_auth
 from src.models.chat import Message
 from src.models.store import Store
-from src.models.user import User
-from src.services.ecc import get_ecc_service, get_e2e_service
-from src.services.llm import get_ollama_service
+from src.services.ecc import get_e2e_service, get_ecc_service
 from src.services.voice import get_voice_service
-from src.agents import get_shopping_agent
-from src.middleware.auth_middleware import require_auth
 
 router = APIRouter(prefix="/api", tags=["Chat"])
 logger = logging.getLogger(__name__)
@@ -33,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 class MessageItem(BaseModel):
     id: str
-    sender_id: Optional[str] = None
-    store_id: Optional[str] = None
+    sender_id: str | None = None
+    store_id: str | None = None
     content: str
     message_type: str
     is_read: bool
@@ -43,7 +39,7 @@ class MessageItem(BaseModel):
 
 
 class MessagesResponse(BaseModel):
-    messages: List[MessageItem]
+    messages: list[MessageItem]
     total: int
     store_id: str
 
@@ -54,9 +50,9 @@ class SendMessageRequest(BaseModel):
     content: str = Field(..., min_length=1)
     message_type: str = Field(default="text")
     encrypted: bool = Field(default=False)
-    session_id: Optional[str] = None
-    ciphertext: Optional[str] = None
-    nonce: Optional[str] = None
+    session_id: str | None = None
+    ciphertext: str | None = None
+    nonce: str | None = None
 
 
 class KeyExchangeRequest(BaseModel):
@@ -83,18 +79,18 @@ class ChatSearchRequest(BaseModel):
     """Request for AI-powered chat search"""
 
     query: str = Field(..., min_length=1, description="Search query")
-    location: Optional[Dict[str, float]] = Field(
+    location: dict[str, float] | None = Field(
         None, description="User location {lat, lng}"
     )
-    radius_km: Optional[int] = Field(5, description="Search radius in km")
-    model: Optional[str] = Field(None, description="Ollama model to use")
+    radius_km: int | None = Field(5, description="Search radius in km")
+    model: str | None = Field(None, description="Ollama model to use")
 
 
 class ChatSearchResponse(BaseModel):
     """Response from AI chat search"""
 
     summary: str
-    stores: List[Dict]
+    stores: list[dict]
     total_found: int
 
 
@@ -197,7 +193,7 @@ async def key_exchange(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Key exchange failed: {str(e)}",
+            detail=f"Key exchange failed: {e!s}",
         )
 
 
@@ -216,7 +212,7 @@ async def send_message(
             except Exception as e:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Decryption failed: {str(e)}",
+                    detail=f"Decryption failed: {e!s}",
                 )
 
         message = Message(
@@ -302,8 +298,8 @@ async def voice_search(
             )
 
         # Save uploaded file temporarily
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
             temp_file.write(await audio.read())
@@ -333,7 +329,7 @@ async def voice_search(
     except Exception as e:
         logger.error(f"Voice search error: {e}")
         return VoiceSearchResponse(
-            text="", success=False, message=f"Voice search failed: {str(e)}"
+            text="", success=False, message=f"Voice search failed: {e!s}"
         )
 
 
@@ -368,5 +364,5 @@ async def chat_search(request: ChatSearchRequest):
         logger.error(f"Chat search error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Chat search failed: {str(e)}",
+            detail=f"Chat search failed: {e!s}",
         )

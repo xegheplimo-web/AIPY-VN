@@ -3,18 +3,15 @@ Promotions API for owner and admin
 """
 
 import uuid
-from typing import Optional, List
-from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, or_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.dialects.postgresql import UUID
-
 from src.database import async_session
+from src.middleware.auth_middleware import get_current_user, require_auth
 from src.models.promotion import Promotion
 from src.models.user import User
-from src.middleware.auth_middleware import get_current_user, require_auth
 
 router = APIRouter(prefix="/api/v1/promotions", tags=["Promotions"])
 
@@ -22,55 +19,55 @@ router = APIRouter(prefix="/api/v1/promotions", tags=["Promotions"])
 class PromotionCreate(BaseModel):
     code: str = Field(..., min_length=3, max_length=50)
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
+    description: str | None = None
     type: str = Field(..., pattern="^(percentage|fixed|free_shipping)$")
-    value: Optional[float] = None
+    value: float | None = None
     min_order_amount: float = 0
-    max_discount: Optional[float] = None
-    usage_limit: Optional[int] = None
+    max_discount: float | None = None
+    usage_limit: int | None = None
     start_date: str
     end_date: str
-    applicable_stores: List[str] = Field(default_factory=lambda: ["all"])
+    applicable_stores: list[str] = Field(default_factory=lambda: ["all"])
 
 
 class PromotionUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    value: Optional[float] = None
-    min_order_amount: Optional[float] = None
-    max_discount: Optional[float] = None
-    usage_limit: Optional[int] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    applicable_stores: Optional[List[str]] = None
-    status: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    value: float | None = None
+    min_order_amount: float | None = None
+    max_discount: float | None = None
+    usage_limit: int | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    applicable_stores: list[str] | None = None
+    status: str | None = None
 
 
 class PromotionResponse(BaseModel):
     id: str
     code: str
     name: str
-    description: Optional[str]
+    description: str | None
     type: str
-    value: Optional[float]
+    value: float | None
     min_order_amount: float
-    max_discount: Optional[float]
-    usage_limit: Optional[int]
+    max_discount: float | None
+    usage_limit: int | None
     used_count: int
     start_date: str
     end_date: str
     status: str
-    applicable_stores: List[str]
+    applicable_stores: list[str]
     created_at: str
 
     class Config:
         from_attributes = True
 
 
-@router.get("", response_model=List[PromotionResponse])
+@router.get("", response_model=list[PromotionResponse])
 async def list_promotions(
-    status: Optional[str] = None,
-    search: Optional[str] = None,
+    status: str | None = None,
+    search: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
     """List all promotions (owner/admin only)"""

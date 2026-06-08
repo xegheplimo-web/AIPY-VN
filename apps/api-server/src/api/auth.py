@@ -10,19 +10,16 @@ Provides:
 """
 
 import uuid
-from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends, status
-from pydantic import BaseModel, Field, EmailStr, field_validator
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, status
 from passlib.context import CryptContext
-
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from sqlalchemy import select
 from src.database import async_session
-from src.models.user import User, Address
-from src.services.ecc import get_jwt_service, get_ecc_service
-from src.middleware.auth_middleware import get_current_user, require_auth
-
+from src.middleware.auth_middleware import require_auth
+from src.models.user import User
+from src.services.ecc import get_ecc_service, get_jwt_service
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -34,9 +31,9 @@ class UserRegisterRequest(BaseModel):
     """Request model for user registration"""
 
     email: EmailStr
-    phone: Optional[str] = Field(None, pattern=r"^(\+84|0)[0-9]{9,10}$")
+    phone: str | None = Field(None, pattern=r"^(\+84|0)[0-9]{9,10}$")
     password: str = Field(..., min_length=8, max_length=100)
-    full_name: Optional[str] = Field(None, max_length=100)
+    full_name: str | None = Field(None, max_length=100)
 
     @field_validator("password")
     @classmethod
@@ -92,8 +89,8 @@ class UserResponse(BaseModel):
 
     id: str
     email: str
-    phone: Optional[str]
-    full_name: Optional[str]
+    phone: str | None
+    full_name: str | None
     role: str
     is_verified: bool
     created_at: str

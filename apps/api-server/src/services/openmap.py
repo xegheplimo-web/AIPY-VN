@@ -6,9 +6,9 @@ Optimized for Vietnamese addresses and POI data.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
-import requests
+from typing import Any
 
+import requests
 from src.config import config
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class OpenMapService:
         radius: int = 1000,
         types: str = "restaurant,cafe,convenience_store,supermarket",
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Tìm POI gần vị trí - tối ưu cho VN.
 
@@ -84,7 +84,7 @@ class OpenMapService:
     async def place_details(
         self,
         place_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Lấy chi tiết POI theo ID.
 
@@ -121,7 +121,7 @@ class OpenMapService:
     async def geocode(
         self,
         address: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Chuyển địa chỉ thành tọa độ.
 
@@ -159,7 +159,7 @@ class OpenMapService:
         self,
         lat: float,
         lon: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Chuyển tọa độ thành địa chỉ.
 
@@ -198,10 +198,10 @@ class OpenMapService:
     async def autocomplete(
         self,
         input_text: str,
-        lat: Optional[float] = None,
-        lon: Optional[float] = None,
+        lat: float | None = None,
+        lon: float | None = None,
         limit: int = 5,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Gợi ý địa chỉ khi gõ.
 
@@ -245,11 +245,11 @@ class OpenMapService:
     async def search_text(
         self,
         query: str,
-        lat: Optional[float] = None,
-        lon: Optional[float] = None,
+        lat: float | None = None,
+        lon: float | None = None,
         radius: int = 5000,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Tìm kiếm theo text query.
 

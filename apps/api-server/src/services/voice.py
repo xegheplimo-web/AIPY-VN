@@ -5,7 +5,6 @@ Provides speech-to-text functionality for Vietnamese voice search.
 """
 
 import logging
-from typing import Optional
 
 try:
     from faster_whisper import WhisperModel
@@ -50,7 +49,7 @@ class VoiceSearchService:
             self.model = None
 
     async def transcribe_audio(
-        self, audio_path: str, language: Optional[str] = None
+        self, audio_path: str, language: str | None = None
     ) -> str:
         """
         Transcribe audio file to text.
@@ -93,7 +92,7 @@ class VoiceSearchService:
             return "Xin lỗi, không thể chuyển đổi giọng nói thành văn bản."
 
     async def transcribe_audio_bytes(
-        self, audio_bytes: bytes, language: Optional[str] = None
+        self, audio_bytes: bytes, language: str | None = None
     ) -> str:
         """
         Transcribe audio bytes to text.

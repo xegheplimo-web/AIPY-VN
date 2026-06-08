@@ -5,7 +5,7 @@ Provides web search functionality using SerpAPI for Google search results.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 from src.config import config
 
@@ -29,10 +29,10 @@ class SerpAPIService:
         self,
         query: str,
         num_results: int = 10,
-        location: Optional[str] = None,
+        location: str | None = None,
         language: str = "vi",
         **kwargs,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Perform web search using SerpAPI.
 
@@ -68,7 +68,7 @@ class SerpAPIService:
 
     async def search_shopping(
         self, query: str, num_results: int = 10, **kwargs
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Perform shopping search.
 
@@ -95,7 +95,7 @@ class SerpAPIService:
 
     async def search_images(
         self, query: str, num_results: int = 10, **kwargs
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Perform image search.
 
@@ -122,7 +122,7 @@ class SerpAPIService:
 
     async def get_search_suggestions(
         self, query: str, num_suggestions: int = 5
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Get search suggestions for a query.
 

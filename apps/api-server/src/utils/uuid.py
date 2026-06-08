@@ -5,6 +5,7 @@ Provides consistent UUID handling across the application.
 """
 
 import uuid
+
 from fastapi import HTTPException, status
 
 

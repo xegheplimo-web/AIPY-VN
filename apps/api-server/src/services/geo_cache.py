@@ -7,7 +7,7 @@ to improve performance and reduce database load.
 
 import json
 import logging
-from typing import Optional, Any, Dict, List
+from typing import Any
 
 from src.cache import cache
 
@@ -55,9 +55,9 @@ class GeoCacheService:
         lat: float,
         lng: float,
         radius_km: float,
-        category: Optional[str] = None,
-        brand: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        category: str | None = None,
+        brand: str | None = None,
+    ) -> dict[str, Any] | None:
         """
         Get cached nearby search results.
         
@@ -94,9 +94,9 @@ class GeoCacheService:
         lat: float,
         lng: float,
         radius_km: float,
-        category: Optional[str],
-        brand: Optional[str],
-        results: Dict[str, Any],
+        category: str | None,
+        brand: str | None,
+        results: dict[str, Any],
     ) -> bool:
         """
         Cache nearby search results.
@@ -135,12 +135,12 @@ class GeoCacheService:
     async def get_search(
         self,
         query: str,
-        lat: Optional[float],
-        lng: Optional[float],
+        lat: float | None,
+        lng: float | None,
         radius_km: float,
-        category: Optional[str],
-        brand: Optional[str],
-    ) -> Optional[Dict[str, Any]]:
+        category: str | None,
+        brand: str | None,
+    ) -> dict[str, Any] | None:
         """
         Get cached search results.
         
@@ -176,12 +176,12 @@ class GeoCacheService:
     async def set_search(
         self,
         query: str,
-        lat: Optional[float],
-        lng: Optional[float],
+        lat: float | None,
+        lng: float | None,
         radius_km: float,
-        category: Optional[str],
-        brand: Optional[str],
-        results: Dict[str, Any],
+        category: str | None,
+        brand: str | None,
+        results: dict[str, Any],
     ) -> bool:
         """
         Cache search results.
@@ -218,7 +218,7 @@ class GeoCacheService:
             logger.error(f"Cache set error: {e}")
             return False
 
-    async def get_geocode(self, address: str) -> Optional[Dict[str, Any]]:
+    async def get_geocode(self, address: str) -> dict[str, Any] | None:
         """
         Get cached geocoding results.
         
@@ -246,7 +246,7 @@ class GeoCacheService:
     async def set_geocode(
         self,
         address: str,
-        results: Dict[str, Any],
+        results: dict[str, Any],
     ) -> bool:
         """
         Cache geocoding results.
@@ -279,7 +279,7 @@ class GeoCacheService:
         self,
         lat: float,
         lng: float,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Get cached reverse geocoding results.
         
@@ -312,7 +312,7 @@ class GeoCacheService:
         self,
         lat: float,
         lng: float,
-        results: Dict[str, Any],
+        results: dict[str, Any],
     ) -> bool:
         """
         Cache reverse geocoding results.
@@ -344,7 +344,7 @@ class GeoCacheService:
             logger.error(f"Cache set error: {e}")
             return False
 
-    async def get_categories(self) -> Optional[List[Dict[str, Any]]]:
+    async def get_categories(self) -> list[dict[str, Any]] | None:
         """
         Get cached categories.
         
@@ -366,7 +366,7 @@ class GeoCacheService:
         
         return None
 
-    async def set_categories(self, categories: List[Dict[str, Any]]) -> bool:
+    async def set_categories(self, categories: list[dict[str, Any]]) -> bool:
         """
         Cache categories.
         
@@ -395,8 +395,8 @@ class GeoCacheService:
 
     async def get_brands(
         self,
-        category: Optional[str] = None
-    ) -> Optional[List[Dict[str, Any]]]:
+        category: str | None = None
+    ) -> list[dict[str, Any]] | None:
         """
         Get cached brands.
         
@@ -423,8 +423,8 @@ class GeoCacheService:
 
     async def set_brands(
         self,
-        brands: List[Dict[str, Any]],
-        category: Optional[str] = None
+        brands: list[dict[str, Any]],
+        category: str | None = None
     ) -> bool:
         """
         Cache brands.
@@ -456,9 +456,9 @@ class GeoCacheService:
     async def get_autocomplete(
         self,
         query: str,
-        lat: Optional[float],
-        lng: Optional[float],
-    ) -> Optional[List[Dict[str, Any]]]:
+        lat: float | None,
+        lng: float | None,
+    ) -> list[dict[str, Any]] | None:
         """
         Get cached autocomplete results.
         
@@ -488,9 +488,9 @@ class GeoCacheService:
     async def set_autocomplete(
         self,
         query: str,
-        lat: Optional[float],
-        lng: Optional[float],
-        suggestions: List[Dict[str, Any]],
+        lat: float | None,
+        lng: float | None,
+        suggestions: list[dict[str, Any]],
     ) -> bool:
         """
         Cache autocomplete results.
@@ -566,7 +566,7 @@ class GeoCacheService:
             logger.error(f"Cache flush error: {e}")
             return False
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """
         Get cache statistics.
         

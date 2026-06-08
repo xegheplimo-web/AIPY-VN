@@ -8,14 +8,13 @@ Provides:
 - Token refresh mechanism
 """
 
-from typing import Optional, Callable
-from fastapi import Request, HTTPException, status
+from collections.abc import Callable
+
+from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPBearer
+from src.services.ecc import get_jwt_service
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-
-from src.services.ecc import get_jwt_service
-
 
 security = HTTPBearer(auto_error=False)
 
@@ -107,7 +106,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"detail": f"Authentication error: {str(e)}"},
+                content={"detail": f"Authentication error: {e!s}"},
             )
 
     def _check_permission(self, method: str, role: str, path: str) -> bool:
@@ -139,7 +138,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return True
 
 
-async def get_current_user(request: Request) -> Optional[dict]:
+async def get_current_user(request: Request) -> dict | None:
     """
     Dependency to get current authenticated user from request state.
 

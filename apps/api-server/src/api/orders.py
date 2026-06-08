@@ -1,19 +1,15 @@
-import uuid
 import random
-import base64
+import uuid
 from datetime import datetime
-from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
-
+from sqlalchemy import func, select
 from src.database import async_session
-from src.models.store import Product
-from src.models.order import Cart, CartItem, Order, OrderItem
-from src.services.ecc import get_request_signer, get_ecc_service
 from src.middleware.auth_middleware import require_auth
+from src.models.order import Order, OrderItem
+from src.models.store import Product
+from src.services.ecc import get_request_signer
 
 router = APIRouter(prefix="/api", tags=["Orders"])
 
@@ -23,26 +19,26 @@ HIGH_VALUE_ORDER_THRESHOLD = 1000000  # Orders over 1M VND require signature
 
 class OrderItemRequest(BaseModel):
     product_id: str
-    variant_id: Optional[str] = None
+    variant_id: str | None = None
     quantity: int = Field(..., ge=1)
     unit_price: float
 
 
 class CreateOrderRequest(BaseModel):
-    items: List[OrderItemRequest]
+    items: list[OrderItemRequest]
     store_id: str
     delivery_method: str = Field(default="pickup")
-    delivery_address: Optional[str] = None
-    delivery_lat: Optional[float] = None
-    delivery_lng: Optional[float] = None
+    delivery_address: str | None = None
+    delivery_lat: float | None = None
+    delivery_lng: float | None = None
     subtotal: float
     shipping_fee: float = 0
     discount: float = 0
     total_amount: float
     payment_method: str = Field(default="cash")
     # Optional request signature for sensitive operations
-    signature: Optional[str] = None
-    timestamp: Optional[str] = None
+    signature: str | None = None
+    timestamp: str | None = None
 
 
 class OrderItemResponse(BaseModel):
@@ -60,7 +56,7 @@ class OrderResponse(BaseModel):
     order_number: str
     store_id: str
     delivery_method: str
-    delivery_address: Optional[str] = None
+    delivery_address: str | None = None
     subtotal: float
     shipping_fee: float
     discount: float
@@ -68,13 +64,13 @@ class OrderResponse(BaseModel):
     payment_method: str
     payment_status: str
     status: str
-    items: List[OrderItemResponse]
+    items: list[OrderItemResponse]
     created_at: str
     model_config = {"from_attributes": True}
 
 
 class OrderListResponse(BaseModel):
-    orders: List[OrderResponse]
+    orders: list[OrderResponse]
     total: int
 
 
@@ -92,8 +88,8 @@ def generate_order_number():
 
 async def verify_order_signature(
     data: CreateOrderRequest,
-    signature: Optional[str],
-    timestamp: Optional[str],
+    signature: str | None,
+    timestamp: str | None,
 ) -> bool:
     """
     Verify request signature for high-value orders.
@@ -128,7 +124,7 @@ async def verify_order_signature(
     return is_valid
 
 
-async def verify_product_stock(session, items: List[OrderItemRequest]) -> None:
+async def verify_product_stock(session, items: list[OrderItemRequest]) -> None:
     """
     Verify all products exist and have enough stock.
 
@@ -197,8 +193,8 @@ async def create_order_record(
 async def create_order_items(
     session,
     order: Order,
-    items: List[OrderItemRequest],
-) -> List[OrderItem]:
+    items: list[OrderItemRequest],
+) -> list[OrderItem]:
     """
     Create order items and update product stock.
 
@@ -238,8 +234,8 @@ async def create_order_items(
 async def create_order(
     data: CreateOrderRequest,
     current_user: dict = Depends(require_auth),
-    x_signature: Optional[str] = Header(None, alias="X-Signature"),
-    x_timestamp: Optional[str] = Header(None, alias="X-Timestamp"),
+    x_signature: str | None = Header(None, alias="X-Signature"),
+    x_timestamp: str | None = Header(None, alias="X-Timestamp"),
 ):
     async with async_session() as session:
         # Get user_id from authenticated user
@@ -351,9 +347,7 @@ async def get_order_detail(order_id: str):
 
 
 @router.get("/users/me/orders", response_model=OrderListResponse)
-async def get_user_orders(
-    user_id: Optional[str] = None, limit: int = 20, offset: int = 0
-):
+async def get_user_orders(user_id: str | None = None, limit: int = 20, offset: int = 0):
     async with async_session() as session:
         # In real app, get user_id from JWT token
         # For now, return all orders

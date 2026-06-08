@@ -1,49 +1,49 @@
+import asyncio
+import logging
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from contextlib import asynccontextmanager
-import os
-import logging
-import asyncio
-
 from src.api import (
-    search,
-    stores,
-    products,
-    owner,
     admin,
-    orders,
     cart,
     chat,
-    shipping,
-    voice,
     notifications,
-    tasks,
+    orders,
+    owner,
     payments,
+    products,
     promotions,
     reports,
+    search,
+    shipping,
+    stores,
+    tasks,
+    voice,
 )
 from src.api.auth import router as auth_router
-from src.api.reviews import router as reviews
-from src.api.profile import router as profile
 from src.api.categories import router as categories
 from src.api.favorites import router as favorites
-from src.api.store_locator import router as store_locator
 from src.api.geo import router as geo
+from src.api.profile import router as profile
+from src.api.reviews import router as reviews
+from src.api.store_locator import router as store_locator
+from src.config import config, validate_config
 
 # from src.database import init_db  # Using Alembic migrations instead
 from src.middleware import (
-    LoggingMiddleware,
-    setup_error_handlers,
-    RateLimitMiddleware,
     AuthMiddleware,
-    RequestValidationMiddleware,
-    CSRFMiddleware,
     BodySizeLimitMiddleware,
+    CSRFMiddleware,
+    LoggingMiddleware,
+    RateLimitMiddleware,
+    RequestValidationMiddleware,
+    setup_error_handlers,
 )
-from src.services.ecc import init_ecc_service, get_e2e_service
-from src.config import config, validate_config
 from src.sentry_config import init_sentry
+from src.services.ecc import get_e2e_service, init_ecc_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -233,11 +233,11 @@ app.include_router(geo)
 @app.get("/health")
 async def health_check():
     """Health check endpoint with system status."""
-    from src.cache import cache
-    from src.vector_db import vector_db
-    from src.config import config
     from sqlalchemy import text
+    from src.cache import cache
+    from src.config import config
     from src.database import async_session
+    from src.vector_db import vector_db
 
     health_status = {
         "status": "ok",
@@ -259,7 +259,7 @@ async def health_check():
         health_status["services"]["database"] = "ok"
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
-        health_status["services"]["database"] = f"error: {str(e)}"
+        health_status["services"]["database"] = f"error: {e!s}"
         health_status["status"] = "degraded"
 
     # Test PostGIS

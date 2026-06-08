@@ -7,9 +7,9 @@ Provides caching for expensive operations:
 - Suggestions
 """
 
-import os
 import json
-from typing import Optional, Any
+import os
+from typing import Any
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
@@ -39,7 +39,7 @@ class CacheClient:
             print(f"WARNING: Could not connect to Redis: {e}")
             self.client = None
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from cache."""
         if not self.client:
             return None

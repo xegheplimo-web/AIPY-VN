@@ -5,7 +5,7 @@ Provides push notification functionality using Firebase Cloud Messaging (FCM).
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 try:
     from firebase_admin import credentials, messaging
@@ -65,7 +65,7 @@ class FirebaseNotificationService:
         return self.app is not None
 
     async def send_to_device(
-        self, token: str, title: str, body: str, data: Optional[Dict[str, Any]] = None
+        self, token: str, title: str, body: str, data: dict[str, Any] | None = None
     ) -> bool:
         """
         Send notification to a specific device.
@@ -102,7 +102,7 @@ class FirebaseNotificationService:
             return False
 
     async def send_to_topic(
-        self, topic: str, title: str, body: str, data: Optional[Dict[str, Any]] = None
+        self, topic: str, title: str, body: str, data: dict[str, Any] | None = None
     ) -> bool:
         """
         Send notification to a topic.
@@ -140,11 +140,11 @@ class FirebaseNotificationService:
 
     async def send_to_devices(
         self,
-        tokens: List[str],
+        tokens: list[str],
         title: str,
         body: str,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Send notification to multiple devices.
 
@@ -210,8 +210,8 @@ class FirebaseNotificationService:
         return await self.send_to_device(token, title, body, data)
 
     async def send_promotion_notification(
-        self, tokens: List[str], promotion_title: str, promotion_body: str
-    ) -> Dict[str, Any]:
+        self, tokens: list[str], promotion_title: str, promotion_body: str
+    ) -> dict[str, Any]:
         """
         Send promotion notification to multiple users.
 

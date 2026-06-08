@@ -5,12 +5,12 @@ Endpoints for payment processing using Stripe.
 """
 
 import logging
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from src.services.stripe import get_stripe_service
 from src.middleware.auth_middleware import require_auth
 from src.models.user import User
+from src.services.stripe import get_stripe_service
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,8 @@ class CreatePaymentIntentRequest(BaseModel):
 
     amount: int = Field(..., gt=0, description="Amount in cents")
     currency: str = Field(default="usd", description="Currency code")
-    order_id: Optional[str] = Field(None, description="Order ID")
-    metadata: Optional[dict] = Field(default=None, description="Additional metadata")
+    order_id: str | None = Field(None, description="Order ID")
+    metadata: dict | None = Field(default=None, description="Additional metadata")
 
 
 class PaymentIntentResponse(BaseModel):
@@ -48,7 +48,7 @@ class RefundRequest(BaseModel):
     """Request to refund a payment."""
 
     payment_intent_id: str = Field(..., description="Payment intent ID")
-    amount: Optional[int] = Field(None, description="Amount to refund in cents")
+    amount: int | None = Field(None, description="Amount to refund in cents")
 
 
 @router.post("/create-intent", response_model=PaymentIntentResponse)
@@ -102,7 +102,7 @@ async def create_payment_intent(
         logger.error(f"Failed to create payment intent: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to create payment intent: {str(e)}"
+            detail=f"Failed to create payment intent: {e!s}"
         )
 
 
@@ -148,7 +148,7 @@ async def confirm_payment(
         logger.error(f"Failed to confirm payment: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to confirm payment: {str(e)}"
+            detail=f"Failed to confirm payment: {e!s}"
         )
 
 
@@ -179,7 +179,7 @@ async def get_payment_intent(
         logger.error(f"Failed to get payment intent: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get payment intent: {str(e)}"
+            detail=f"Failed to get payment intent: {e!s}"
         )
 
 
@@ -214,7 +214,7 @@ async def refund_payment(
         logger.error(f"Failed to refund payment: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to refund payment: {str(e)}"
+            detail=f"Failed to refund payment: {e!s}"
         )
 
 

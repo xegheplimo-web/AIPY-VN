@@ -3,18 +3,16 @@ Reports API for admin moderation
 """
 
 import uuid
-from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, or_
+from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import UUID
-
 from src.database import async_session
+from src.middleware.auth_middleware import get_current_user, require_auth
 from src.models.report import Report
 from src.models.user import User
-from src.middleware.auth_middleware import get_current_user, require_auth
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 
@@ -25,12 +23,12 @@ class ReportCreate(BaseModel):
     target_name: str
     reason: str = Field(..., pattern="^(fake_products|wrong_price|harassment|scam|spam|inappropriate)$")
     description: str = Field(..., min_length=10)
-    evidence: Optional[List[str]] = None
+    evidence: list[str] | None = None
 
 
 class ReportUpdate(BaseModel):
-    status: Optional[str] = None
-    resolution_notes: Optional[str] = None
+    status: str | None = None
+    resolution_notes: str | None = None
 
 
 class ReportResponse(BaseModel):
@@ -43,21 +41,21 @@ class ReportResponse(BaseModel):
     reason: str
     description: str
     status: str
-    evidence: Optional[List[str]]
-    resolution_notes: Optional[str]
-    resolved_by: Optional[str]
-    resolved_at: Optional[str]
+    evidence: list[str] | None
+    resolution_notes: str | None
+    resolved_by: str | None
+    resolved_at: str | None
     created_at: str
 
     class Config:
         from_attributes = True
 
 
-@router.get("", response_model=List[ReportResponse])
+@router.get("", response_model=list[ReportResponse])
 async def list_reports(
-    status: Optional[str] = None,
-    type_filter: Optional[str] = None,
-    search: Optional[str] = None,
+    status: str | None = None,
+    type_filter: str | None = None,
+    search: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
     """List all reports (admin only)"""

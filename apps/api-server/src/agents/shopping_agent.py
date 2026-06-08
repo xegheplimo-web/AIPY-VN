@@ -4,10 +4,11 @@ VietStore Shopping AI Agent
 Simple AI agent for helping users find products and stores using Ollama Cloud.
 """
 
-from typing import Optional, Dict, Any
-from src.services.llm import get_ollama_service
-from src.config import config
 import logging
+from typing import Any
+
+from src.config import config
+from src.services.llm import get_ollama_service
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ When users ask about stores, mention location and availability.
 Always be friendly and helpful."""
 
     async def chat(
-        self, user_message: str, context: Optional[Dict[str, Any]] = None
+        self, user_message: str, context: dict[str, Any] | None = None
     ) -> str:
         """
         Chat with the user using Ollama Cloud.
@@ -63,7 +64,7 @@ Always be friendly and helpful."""
             return "Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau."
 
     async def search_products(
-        self, query: str, location: Optional[Dict[str, float]] = None
+        self, query: str, location: dict[str, float] | None = None
     ) -> str:
         """
         Search for products based on user query.
@@ -79,7 +80,7 @@ Always be friendly and helpful."""
         return await self.chat(f"Tìm kiếm sản phẩm: {query}", context)
 
     async def search_stores(
-        self, query: str, location: Optional[Dict[str, float]] = None
+        self, query: str, location: dict[str, float] | None = None
     ) -> str:
         """
         Search for stores based on user query.
@@ -94,7 +95,7 @@ Always be friendly and helpful."""
         context = {"location": location, "search_type": "store_search"}
         return await self.chat(f"Tìm kiếm cửa hàng: {query}", context)
 
-    async def get_recommendations(self, user_preferences: Dict[str, Any]) -> str:
+    async def get_recommendations(self, user_preferences: dict[str, Any]) -> str:
         """
         Get product recommendations based on user preferences.
 

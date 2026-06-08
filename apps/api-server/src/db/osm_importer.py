@@ -6,11 +6,10 @@ Imports POI data from OpenStreetMap for Vietnam using Overpass API.
 
 import asyncio
 import logging
-from typing import Optional, Dict
-import httpx
 
-from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -82,14 +81,14 @@ class OSMImporter:
         """Close HTTP client."""
         await self.client.aclose()
 
-    async def get_category_map(self) -> Dict[str, int]:
+    async def get_category_map(self) -> dict[str, int]:
         """Get mapping from category slug to database ID."""
         result = await self.session.execute(
             text("SELECT id, slug FROM store_categories")
         )
         return {row['slug']: row['id'] for row in result}
 
-    async def get_brand_map(self) -> Dict[str, int]:
+    async def get_brand_map(self) -> dict[str, int]:
         """Get mapping from brand name to database ID."""
         result = await self.session.execute(
             text("SELECT id, name, slug FROM brands")
@@ -221,7 +220,7 @@ class OSMImporter:
 
     def _detect_brand(
         self, name: str, tags: dict, brand_map: dict
-    ) -> Optional[int]:
+    ) -> int | None:
         """Detect brand from name or OSM tags."""
         # Check OSM brand tag
         brand_tag = tags.get('brand', '').lower()

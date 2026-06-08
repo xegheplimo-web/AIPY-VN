@@ -5,6 +5,7 @@ Background tasks for sending push notifications.
 """
 
 import logging
+
 from src.celery_app import celery_app
 from src.services.firebase import get_firebase_service
 

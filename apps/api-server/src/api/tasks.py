@@ -5,6 +5,7 @@ Endpoints for managing and triggering background tasks.
 """
 
 import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from src.celery_app import celery_app
@@ -60,7 +61,7 @@ async def send_email_task(request: SendEmailRequest):
         logger.error(f"Failed to queue email task: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to queue email task: {str(e)}"
+            detail=f"Failed to queue email task: {e!s}"
         )
 
 
@@ -84,7 +85,7 @@ async def send_welcome_email_task(email: str, name: str):
         logger.error(f"Failed to queue welcome email task: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to queue welcome email task: {str(e)}"
+            detail=f"Failed to queue welcome email task: {e!s}"
         )
 
 
@@ -108,7 +109,7 @@ async def process_order_task(request: ProcessOrderRequest):
         logger.error(f"Failed to queue order processing task: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to queue order processing task: {str(e)}"
+            detail=f"Failed to queue order processing task: {e!s}"
         )
 
 
@@ -136,7 +137,7 @@ async def get_task_status(task_id: str):
         logger.error(f"Failed to get task status: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get task status: {str(e)}"
+            detail=f"Failed to get task status: {e!s}"
         )
 
 
@@ -166,5 +167,5 @@ async def test_background_task():
         logger.error(f"Failed to queue test task: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to queue test task: {str(e)}"
+            detail=f"Failed to queue test task: {e!s}"
         )
