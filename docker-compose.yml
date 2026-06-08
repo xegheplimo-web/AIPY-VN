@@ -60,6 +60,89 @@ services:
           cpus: '0.25'
           memory: 256M
 
+  api-server:
+    build:
+      context: ./apps/api-server
+      dockerfile: Dockerfile
+    ports: ["9000:9000"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/vietstore
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      ENVIRONMENT: development
+      DEBUG: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - ./apps/api-server:/app
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  web-customer:
+    build:
+      context: ./apps/web-customer
+      dockerfile: Dockerfile
+    ports: ["3000:3000"]
+    environment:
+      VITE_API_URL: http://localhost:9000
+    depends_on:
+      - api-server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  web-owner:
+    build:
+      context: ./apps/web-owner
+      dockerfile: Dockerfile
+    ports: ["3001:3001"]
+    environment:
+      VITE_API_URL: http://localhost:9000
+    depends_on:
+      - api-server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  web-admin:
+    build:
+      context: ./apps/web-admin
+      dockerfile: Dockerfile
+    ports: ["3002:3002"]
+    environment:
+      VITE_API_URL: http://localhost:9000
+    depends_on:
+      - api-server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
 volumes:
   pgdata:
   redisdata:
