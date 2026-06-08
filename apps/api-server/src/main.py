@@ -326,3 +326,11 @@ async def health_check():
         health_status["services"]["vector_db"] = "disabled"
 
     return health_status
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    from src.services.prometheus_metrics import get_metrics
+
+    return get_metrics()
