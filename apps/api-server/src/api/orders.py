@@ -81,6 +81,16 @@ class ConfirmOrderResponse(BaseModel):
     status: str
 
 
+async def _fetch_product_names(session, order_items) -> dict:
+    """Fetch product names from DB for the given order items."""
+    product_ids = [item.product_id for item in order_items]
+    if product_ids:
+        product_stmt = select(Product.id, Product.name).where(Product.id.in_(product_ids))
+        product_result = await session.execute(product_stmt)
+        return {str(pid): pname for pid, pname in product_result.all()}
+    return {}
+
+
 @router.post("/orders", response_model=OrderResponse, status_code=201)
 @per_user_rate_limit("10/minute")
 async def create_order(
@@ -120,7 +130,7 @@ async def create_order(
         order = Order(
             id=uuid.uuid4(),
             order_number=order_number,
-            user_id=current_user.id,
+            user_id=uuid.UUID(current_user["id"]),
             store_id=uuid.UUID(request.store_id),
             delivery_method=request.delivery_method,
             delivery_address=request.delivery_address,
@@ -162,6 +172,9 @@ async def create_order(
         )
         order_result = order_with_items.scalar_one()
 
+        # Fetch product names from DB
+        product_names = await _fetch_product_names(session, order_result.items)
+
         return OrderResponse(
             id=str(order_result.id),
             order_number=order_result.order_number,
@@ -179,14 +192,14 @@ async def create_order(
                 OrderItemResponse(
                     id=str(item.id),
                     product_id=str(item.product_id),
-                    product_name=f"Product {item.product_id}",
+                    product_name=product_names.get(str(item.product_id), f"Product {item.product_id}"),
                     quantity=item.quantity,
                     unit_price=float(item.unit_price),
                     subtotal=float(item.subtotal),
                 )
                 for item in order_result.items
             ],
-            created_at=order_result.created_at or datetime.now().isoformat(),
+            created_at=str(order_result.created_at) if order_result.created_at else datetime.now().isoformat(),
         )
 
 
@@ -203,6 +216,9 @@ async def get_order(order_id: str):
 
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+
+        # Fetch product names from DB
+        product_names = await _fetch_product_names(session, order.items)
 
         return OrderResponse(
             id=str(order.id),
@@ -221,45 +237,43 @@ async def get_order(order_id: str):
                 OrderItemResponse(
                     id=str(item.id),
                     product_id=str(item.product_id),
-                    product_name=f"Product {item.product_id}",
+                    product_name=product_names.get(str(item.product_id), f"Product {item.product_id}"),
                     quantity=item.quantity,
                     unit_price=float(item.unit_price),
                     subtotal=float(item.subtotal),
                 )
                 for item in order.items
             ],
-            created_at=order.created_at or datetime.now().isoformat(),
+            created_at=str(order.created_at) if order.created_at else datetime.now().isoformat(),
         )
 
 
 @router.get("/users/me/orders", response_model=OrderListResponse)
-async def get_user_orders(user_id: str | None = None, limit: int = 20, offset: int = 0):
+async def get_user_orders(current_user=Depends(require_auth), limit: int = 20, offset: int = 0):
     """Get user orders with pagination (eager loading to prevent N+1)"""
+    user_id = uuid.UUID(current_user["id"])
     async with async_session() as session:
-        # In real app, get user_id from JWT token
-        # For now, return all orders
-        count_stmt = select(func.count(Order.id))
-        if user_id:
-            count_stmt = count_stmt.where(Order.user_id == uuid.UUID(user_id))
+        count_stmt = select(func.count(Order.id)).where(Order.user_id == user_id)
         count_result = await session.execute(count_stmt)
         total = count_result.scalar_one()
 
         stmt = (
             select(Order)
-            .options(selectinload(Order.items))  # Eager load items to prevent N+1
+            .options(selectinload(Order.items))
+            .where(Order.user_id == user_id)
             .order_by(Order.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
-        if user_id:
-            stmt = stmt.where(Order.user_id == uuid.UUID(user_id))
 
         result = await session.execute(stmt)
         orders = result.scalars().all()
 
         order_responses = []
         for order in orders:
-            # Items are already loaded due to selectinload
+            # Fetch product names from DB for this order's items
+            product_names = await _fetch_product_names(session, order.items)
+
             order_responses.append(
                 OrderResponse(
                     id=str(order.id),
@@ -278,14 +292,14 @@ async def get_user_orders(user_id: str | None = None, limit: int = 20, offset: i
                         OrderItemResponse(
                             id=str(item.id),
                             product_id=str(item.product_id),
-                            product_name=f"Product {item.product_id}",
+                            product_name=product_names.get(str(item.product_id), f"Product {item.product_id}"),
                             quantity=item.quantity,
                             unit_price=float(item.unit_price),
                             subtotal=float(item.subtotal),
                         )
                         for item in order.items
                     ],
-                    created_at=order.created_at or datetime.now().isoformat(),
+                    created_at=str(order.created_at) if order.created_at else datetime.now().isoformat(),
                 )
             )
 
@@ -293,8 +307,12 @@ async def get_user_orders(user_id: str | None = None, limit: int = 20, offset: i
 
 
 @router.patch("/orders/{order_id}/status")
-async def update_order_status(order_id: str, new_status: str):
-    """Update order status"""
+async def update_order_status(order_id: str, new_status: str, current_user=Depends(require_auth)):
+    """Update order status (requires owner/admin role)"""
+    # Validate status transition
+    valid_statuses = ["pending", "confirmed", "preparing", "ready", "delivering", "completed", "cancelled"]
+    if new_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
     async with async_session() as session:
         result = await session.execute(
             select(Order).where(Order.id == uuid.UUID(order_id))

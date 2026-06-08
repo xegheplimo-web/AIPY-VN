@@ -192,7 +192,9 @@ async def websocket_endpoint(
                     async with async_session() as session:
                         message = ChatMessage(
                             id=uuid.uuid4(),
+                            conversation_id=uuid.UUID(room_id) if room_id else uuid.uuid4(),
                             sender_id=UUID(user_id),
+                            store_id=UUID(room_id) if room_id else None,
                             receiver_id=UUID(receiver_id),
                             content=content,
                             is_read=False,
@@ -210,7 +212,7 @@ async def websocket_endpoint(
                                     "sender_id": str(message.sender_id),
                                     "receiver_id": str(message.receiver_id),
                                     "content": message.content,
-                                    "created_at": message.created_at,
+                                    "created_at": str(message.created_at) if message.created_at else None,
                                 },
                             },
                             room_id,
@@ -299,7 +301,9 @@ async def chat_websocket(
                     async with async_session() as session:
                         message = ChatMessage(
                             id=uuid.uuid4(),
+                            conversation_id=uuid.UUID(room_id) if room_id else uuid.uuid4(),
                             sender_id=UUID(user_id),
+                            store_id=UUID(room_id) if room_id else None,
                             receiver_id=UUID(receiver_id),
                             content=content,
                             is_read=False,
@@ -317,7 +321,7 @@ async def chat_websocket(
                                     "sender_id": str(message.sender_id),
                                     "receiver_id": str(message.receiver_id),
                                     "content": message.content,
-                                    "created_at": message.created_at,
+                                    "created_at": str(message.created_at) if message.created_at else None,
                                 },
                             },
                             room_id,

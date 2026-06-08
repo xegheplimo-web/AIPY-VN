@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { apiService } from '../services/api';
+import apiService from '../services/api';
 
 interface OrderItem {
   id: string;
@@ -100,7 +100,6 @@ export default function OrderTrackingPage() {
   const loadOrder = async (orderId: string) => {
     try {
       const data = await apiService.getOrder(orderId);
-      // Handle both wrapped and unwrapped responses
       const orderData = (data as any)?.data || data;
       setOrder(orderData as Order);
     } catch (err) {
@@ -112,7 +111,6 @@ export default function OrderTrackingPage() {
 
   const handleCancelOrder = async () => {
     if (!order?.id || !confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) return;
-
     setCancelling(true);
     try {
       await apiService.cancelOrder(order.id);
@@ -125,21 +123,15 @@ export default function OrderTrackingPage() {
   };
 
   const handleCallStore = () => {
-    if (order?.store.phone) {
-      window.location.href = `tel:${order.store.phone}`;
-    }
+    if (order?.store.phone) window.location.href = `tel:${order.store.phone}`;
   };
 
   const handleChatStore = () => {
-    if (order) {
-      navigate(`/chat?store_id=${order.store.id}`);
-    }
+    if (order) navigate(`/chat?store_id=${order.store.id}`);
   };
 
   const handleCallShipper = () => {
-    if (order?.shipper?.phone) {
-      window.location.href = `tel:${order.shipper.phone}`;
-    }
+    if (order?.shipper?.phone) window.location.href = `tel:${order.shipper.phone}`;
   };
 
   const getCurrentStepIndex = () => {
@@ -162,9 +154,7 @@ export default function OrderTrackingPage() {
       <div className="max-w-lg mx-auto p-4 text-center">
         <AlertCircle className="w-16 h-16 mx-auto text-gray-300 mb-4" />
         <h2 className="text-xl font-semibold text-gray-700">Không tìm thấy đơn hàng</h2>
-        <Link to="/orders" className="mt-4 inline-block px-6 py-2 bg-blue-600 text-white rounded-lg">
-          Xem đơn hàng của bạn
-        </Link>
+        <Link to="/orders" className="mt-4 inline-block px-6 py-2 bg-blue-600 text-white rounded-lg">Xem đơn hàng của bạn</Link>
       </div>
     );
   }
@@ -174,9 +164,7 @@ export default function OrderTrackingPage() {
   return (
     <div className="max-w-lg mx-auto p-4 pb-32">
       <div className="flex items-center gap-3 mb-6">
-        <Link to="/orders" className="p-2 hover:bg-gray-100 rounded-full">
-          <ChevronRight className="w-5 h-5 rotate-180" />
-        </Link>
+        <Link to="/orders" className="p-2 hover:bg-gray-100 rounded-full"><ChevronRight className="w-5 h-5 rotate-180" /></Link>
         <h1 className="text-xl font-bold">Chi tiết đơn hàng</h1>
       </div>
 
@@ -186,9 +174,7 @@ export default function OrderTrackingPage() {
             <p className="font-bold text-lg">{order.order_number}</p>
             <p className="text-sm text-gray-500">{new Date(order.created_at).toLocaleString('vi-VN')}</p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            order.status === 'completed' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-          }`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'completed' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
             {STATUS_LABELS[order.status] || order.status}
           </span>
         </div>
@@ -282,15 +268,11 @@ export default function OrderTrackingPage() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-600">Phương thức</span>
-            <span className="font-medium">
-              {order.payment_method === 'cod' ? 'Thanh toán khi nhận hàng' : order.payment_method === 'momo' ? 'Ví MoMo' : order.payment_method === 'zalopay' ? 'ZaloPay' : 'Thẻ'}
-            </span>
+            <span className="font-medium">{order.payment_method === 'cod' ? 'Thanh toán khi nhận hàng' : order.payment_method === 'momo' ? 'Ví MoMo' : order.payment_method === 'zalopay' ? 'ZaloPay' : 'Thẻ'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Trạng thái</span>
-            <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
-              {order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
-            </span>
+            <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>{order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}</span>
           </div>
         </div>
       </div>

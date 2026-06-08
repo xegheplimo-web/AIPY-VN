@@ -8,6 +8,8 @@ from sqlalchemy import (
     ForeignKey,
     JSON,
     Index,
+    DateTime,
+    func as sa_func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -33,8 +35,8 @@ class Promotion(Base):
     status = Column(String(20), default="active")  # active, expired, scheduled, paused
     applicable_stores = Column(JSON)  # ["all"] or ["store_id1", "store_id2"]
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    created_at = Column(String, default="now()")
-    updated_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())
 
     __table_args__ = (
         Index("idx_promotion_code", "code"),

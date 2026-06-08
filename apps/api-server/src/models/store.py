@@ -10,6 +10,8 @@ from sqlalchemy import (
     ForeignKey,
     Table,
     Index,
+    DateTime,
+    func as sa_func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -39,8 +41,8 @@ class Store(Base):
     industry = Column(String(100))
     status = Column(String(20), default="active")
     location_verified = Column(Boolean, default=False)
-    created_at = Column(String, default="now()")
-    updated_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())
 
     products = relationship("Product", back_populates="store")
 
@@ -70,8 +72,8 @@ class Product(Base):
     shelf_location = Column(String(100))
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"))
     status = Column(String(20), default="active")
-    created_at = Column(String, default="now()")
-    updated_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())
 
     store = relationship("Store", back_populates="products")
     category = relationship("Category", back_populates="products")
@@ -96,6 +98,7 @@ class Category(Base):
     description = Column(Text)
     sort_order = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
-    created_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())
 
     products = relationship("Product", back_populates="category")

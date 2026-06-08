@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart, Share2, Store, MapPin, Star, Minus, Plus } from 'lucide-react';
-import { apiService } from '../services/api';
+import apiService from '../services/api';
 import type { Product, Store } from '../services/api';
 
 interface ProductOffer {

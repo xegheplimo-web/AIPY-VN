@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from src.database import async_session
+from src.models.order import Order
 from src.models.store import Product, Store
 
 router = APIRouter(prefix="/api/owner", tags=["Owner"])
@@ -119,7 +120,7 @@ async def owner_list_products(
                 brand=p.brand,
                 shelf_location=p.shelf_location,
                 status=p.status,
-                created_at=p.created_at,
+                created_at=str(p.created_at) if p.created_at else None,
             )
             for p in products
         ]
@@ -299,8 +300,20 @@ async def owner_analytics_summary(store_id: str):
         low_stock_count = low_stock_result.scalar_one()
 
         # Mock orders data (would come from Order model in full implementation)
-        total_orders = 0
-        total_revenue = 0.0
+        # Count real orders
+        orders_stmt = select(func.count(Order.id)).where(
+            Order.store_id == uuid.UUID(store_id)
+        )
+        orders_result = await session.execute(orders_stmt)
+        total_orders = orders_result.scalar_one()
+
+        # Calculate real revenue
+        revenue_stmt = select(func.sum(Order.total_amount)).where(
+            Order.store_id == uuid.UUID(store_id),
+            Order.payment_status == "paid",
+        )
+        revenue_result = await session.execute(revenue_stmt)
+        total_revenue = float(revenue_result.scalar_one() or 0)
 
         return AnalyticsSummaryResponse(
             store_id=store_id,

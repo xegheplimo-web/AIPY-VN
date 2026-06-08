@@ -215,6 +215,10 @@ class ApiService {
     return response;
   }
 
+  async getProfile() {
+    return this.request<any>('/api/auth/me');
+  }
+
   async register(data: { email: string; password: string; full_name?: string; phone?: string }) {
     const response = await this.request<{
       access_token: string;

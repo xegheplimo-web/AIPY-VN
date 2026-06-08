@@ -9,8 +9,11 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Index,
+    DateTime,
+    func as sa_func,
 )
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 import uuid
 
 from src.database import Base
@@ -23,8 +26,8 @@ class Cart(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     store_id = Column(UUID(as_uuid=True), ForeignKey("stores.id"))
     status = Column(String(20), default="active")
-    created_at = Column(String, default="now()")
-    updated_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())
 
 
 class CartItem(Base):
@@ -36,7 +39,7 @@ class CartItem(Base):
     variant_id = Column(UUID(as_uuid=True), ForeignKey("product_variants.id"))
     quantity = Column(Integer, nullable=False, default=1)
     unit_price = Column(DECIMAL(12, 2), nullable=False)
-    created_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
 
 
 class Order(Base):
@@ -59,7 +62,9 @@ class Order(Base):
     status = Column(String(20), default="pending")
     confirmed_at = Column(String)
     completed_at = Column(String)
-    created_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+
+    items = relationship("OrderItem", back_populates="order", lazy="selectin")
 
     __table_args__ = (
         Index("idx_order_user_id", "user_id"),
@@ -80,6 +85,8 @@ class OrderItem(Base):
     quantity = Column(Integer, nullable=False)
     unit_price = Column(DECIMAL(12, 2), nullable=False)
     subtotal = Column(DECIMAL(12, 2), nullable=False)
+
+    order = relationship("Order", back_populates="items")
 
 
 class ProductVariant(Base):
