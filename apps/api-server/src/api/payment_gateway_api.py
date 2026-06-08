@@ -2,7 +2,7 @@
 Payment gateway API endpoints
 """
 
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, Depends
 from typing import Optional
 from pydantic import BaseModel, Field
 from src.middleware.auth_middleware import require_auth
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
 class CreatePaymentIntentRequest(BaseModel):
     """Request model for creating payment intent"""
+
     amount: float = Field(..., gt=0, description="Amount in VND")
     currency: str = Field(default="vnd", description="Currency code")
     order_id: str = Field(..., description="Order ID")
@@ -23,12 +24,14 @@ class CreatePaymentIntentRequest(BaseModel):
 
 class ConfirmPaymentIntentRequest(BaseModel):
     """Request model for confirming payment intent"""
+
     payment_intent_id: str
     payment_method_id: str
 
 
 class CreateRefundRequest(BaseModel):
     """Request model for creating refund"""
+
     payment_intent_id: str
     amount: Optional[float] = None
     reason: Optional[str] = None
@@ -36,6 +39,7 @@ class CreateRefundRequest(BaseModel):
 
 class CreateCustomerRequest(BaseModel):
     """Request model for creating customer"""
+
     email: str
     name: Optional[str] = None
     phone: Optional[str] = None
@@ -49,7 +53,7 @@ async def create_payment_intent(
 ):
     """
     Create a payment intent
-    
+
     - Creates Stripe payment intent
     - Returns client secret for frontend
     - Includes order metadata
@@ -62,9 +66,9 @@ async def create_payment_intent(
             customer_email=request.customer_email,
             metadata=request.metadata,
         )
-        
+
         return intent
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -76,7 +80,7 @@ async def confirm_payment_intent(
 ):
     """
     Confirm a payment intent
-    
+
     - Confirms Stripe payment intent
     - Processes payment
     - Returns payment status
@@ -86,9 +90,9 @@ async def confirm_payment_intent(
             payment_intent_id=request.payment_intent_id,
             payment_method_id=request.payment_method_id,
         )
-        
+
         return intent
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -100,16 +104,18 @@ async def get_payment_intent(
 ):
     """
     Retrieve payment intent status
-    
+
     - Gets payment intent from Stripe
     - Returns current status
     - Includes metadata
     """
     try:
-        intent = await payment_gateway_service.retrieve_payment_intent(payment_intent_id)
-        
+        intent = await payment_gateway_service.retrieve_payment_intent(
+            payment_intent_id
+        )
+
         return intent
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -121,7 +127,7 @@ async def create_refund(
 ):
     """
     Create a refund
-    
+
     - Refunds payment intent
     - Supports partial refunds
     - Requires admin role
@@ -129,16 +135,16 @@ async def create_refund(
     # Check if user is admin
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     try:
         refund = await payment_gateway_service.create_refund(
             payment_intent_id=request.payment_intent_id,
             amount=request.amount,
             reason=request.reason,
         )
-        
+
         return refund
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -150,7 +156,7 @@ async def create_customer(
 ):
     """
     Create a Stripe customer
-    
+
     - Creates customer in Stripe
     - Links to user account
     - Stores customer ID
@@ -162,9 +168,9 @@ async def create_customer(
             phone=request.phone,
             metadata=request.metadata,
         )
-        
+
         return customer
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -176,7 +182,7 @@ async def handle_webhook(
 ):
     """
     Handle Stripe webhook events
-    
+
     - Verifies webhook signature
     - Processes payment events
     - Updates order status
@@ -184,24 +190,27 @@ async def handle_webhook(
     """
     # Get webhook signature
     sig_header = request.headers.get("stripe-signature")
-    
+
     # Read payload
     payload = await request.body()
-    
+
     # Verify signature
-    is_valid = await payment_gateway_service.verify_webhook_signature(payload, sig_header)
-    
+    is_valid = await payment_gateway_service.verify_webhook_signature(
+        payload, sig_header
+    )
+
     if not is_valid:
         raise HTTPException(status_code=400, detail="Invalid signature")
-    
+
     # Parse event
     import json
+
     event_data = json.loads(payload)
     event_type = event_data.get("type")
-    
+
     # Handle event in background
     background_tasks.add_task(
         payment_gateway_service.handle_webhook_event(event_type, event_data)
     )
-    
+
     return {"status": "received"}

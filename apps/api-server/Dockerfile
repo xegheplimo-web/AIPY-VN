@@ -25,6 +25,6 @@ COPY alembic.ini ./alembic.ini
 # Make uv available
 RUN pip install uv
 
-EXPOSE 8000
+EXPOSE 9000
 
-CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "9000"]

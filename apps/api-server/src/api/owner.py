@@ -2,7 +2,9 @@ import csv
 import io
 import uuid
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from src.middleware.auth_middleware import require_auth
+from src.models.user import User
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from src.database import async_session
@@ -79,7 +81,12 @@ async def owner_list_products(
     page: int = 1,
     limit: int = 20,
     search: str | None = None,
+    current_user: User = Depends(require_auth),
 ):
+
+    # Auth check
+    if current_user.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Owner or admin access required")
     async with async_session() as session:
         # Verify store exists
         store_stmt = select(Store).where(Store.id == uuid.UUID(store_id))
@@ -131,7 +138,15 @@ async def owner_list_products(
 
 
 @router.post("/products")
-async def owner_create_product(data: CreateProductRequest, store_id: str):
+async def owner_create_product(
+    data: CreateProductRequest,
+    store_id: str,
+    current_user: User = Depends(require_auth),
+):
+
+    # Auth check
+    if current_user.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Owner or admin access required")
     async with async_session() as session:
         product = Product(
             id=uuid.uuid4(),
@@ -160,8 +175,15 @@ async def owner_create_product(data: CreateProductRequest, store_id: str):
 
 @router.put("/products/{product_id}")
 async def owner_update_product(
-    product_id: str, data: UpdateProductRequest, store_id: str
+    product_id: str,
+    data: UpdateProductRequest,
+    store_id: str,
+    current_user: User = Depends(require_auth),
 ):
+
+    # Auth check
+    if current_user.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Owner or admin access required")
     async with async_session() as session:
         stmt = select(Product).where(
             Product.id == uuid.UUID(product_id),
@@ -201,7 +223,15 @@ async def owner_update_product(
 
 
 @router.delete("/products/{product_id}")
-async def owner_delete_product(product_id: str, store_id: str):
+async def owner_delete_product(
+    product_id: str,
+    store_id: str,
+    current_user: User = Depends(require_auth),
+):
+
+    # Auth check
+    if current_user.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Owner or admin access required")
     async with async_session() as session:
         stmt = select(Product).where(
             Product.id == uuid.UUID(product_id),
@@ -224,7 +254,15 @@ async def owner_delete_product(product_id: str, store_id: str):
 
 
 @router.post("/products/bulk-upload")
-async def owner_bulk_upload(store_id: str, file: UploadFile = File(...)):
+async def owner_bulk_upload(
+    store_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_auth),
+):
+
+    # Auth check
+    if current_user.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Owner or admin access required")
     async with async_session() as session:
         content = await file.read()
         decoded = content.decode("utf-8-sig")
@@ -282,7 +320,14 @@ async def owner_bulk_upload(store_id: str, file: UploadFile = File(...)):
 
 
 @router.get("/analytics/summary")
-async def owner_analytics_summary(store_id: str):
+async def owner_analytics_summary(
+    store_id: str,
+    current_user: User = Depends(require_auth),
+):
+
+    # Auth check
+    if current_user.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Owner or admin access required")
     async with async_session() as session:
         # Count products
         products_stmt = select(func.count(Product.id)).where(

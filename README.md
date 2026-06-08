@@ -119,15 +119,15 @@ After seeding, you can use these test accounts:
 
 **Customer:**
 - Email: customer@example.com
-- Password: password123
+- Password: Password123
 
 **Owner:**
 - Email: owner@example.com
-- Password: password123
+- Password: Password123
 
 **Admin:**
 - Email: admin@example.com
-- Password: password123
+- Password: Password123
 
 ## 🎯 Features
 

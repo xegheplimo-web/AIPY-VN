@@ -1,8 +1,9 @@
-
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from src.middleware.auth_middleware import require_auth
+from src.models.user import User
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from src.database import async_session
@@ -55,7 +56,10 @@ class IndustryListResponse(BaseModel):
 
 
 @router.get("/stats", response_model=AdminStatsResponse)
-async def admin_stats():
+async def admin_stats(current_user: User = Depends(require_auth)):
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     async with async_session() as session:
         stores_count = await session.execute(select(func.count(Store.id)))
         products_count = await session.execute(select(func.count(Product.id)))
@@ -82,7 +86,13 @@ async def admin_stats():
 
 
 @router.get("/match-queue", response_model=MatchQueueResponse)
-async def admin_match_queue(status_filter: str = Query("pending", alias="status")):
+async def admin_match_queue(
+    status_filter: str = Query("pending", alias="status"),
+    current_user: User = Depends(require_auth),
+):
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     """Get potential matches between registered stores and existing data"""
     async with async_session() as session:
         # Get stores that haven't been verified yet
@@ -100,7 +110,11 @@ async def admin_match_queue(status_filter: str = Query("pending", alias="status"
                     registered_store_name=store.name,
                     similarity=1.0,
                     status="pending",
-                    created_at=str(store.created_at) if store.created_at else datetime.now().isoformat(),
+                    created_at=(
+                        str(store.created_at)
+                        if store.created_at
+                        else datetime.now().isoformat()
+                    ),
                 )
             )
 
@@ -108,7 +122,13 @@ async def admin_match_queue(status_filter: str = Query("pending", alias="status"
 
 
 @router.post("/matches/{match_id}/approve", response_model=ApproveMatchResponse)
-async def admin_approve_match(match_id: str):
+async def admin_approve_match(
+    match_id: str,
+    current_user: User = Depends(require_auth),
+):
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     return ApproveMatchResponse(
         match_id=match_id,
         status="approved",
@@ -118,6 +138,9 @@ async def admin_approve_match(match_id: str):
 
 @router.get("/industries", response_model=IndustryListResponse)
 async def admin_list_industries():
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     async with async_session() as session:
         # Get distinct industries from stores
         stmt = select(Store.industry).where(Store.industry.isnot(None)).distinct()

@@ -3,7 +3,7 @@ Advanced search API endpoints
 """
 
 from fastapi import APIRouter, Query, HTTPException
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 from src.middleware.auth_middleware import require_auth
 from src.models.user import User
@@ -17,13 +17,17 @@ router = APIRouter(prefix="/api/search", tags=["Advanced Search"])
 
 class SearchFilterModel(BaseModel):
     """Search filter model"""
+
     field: str
-    operator: str = Field(..., pattern="^(eq|ne|gt|gte|lt|lte|like|ilike|in|not_in|is_null)$")
-    value: any
+    operator: str = Field(
+        ..., pattern="^(eq|ne|gt|gte|lt|lte|like|ilike|in|not_in|is_null)$"
+    )
+    value: Any
 
 
 class ProductSearchRequest(BaseModel):
     """Product search request model"""
+
     query: Optional[str] = None
     filters: Optional[List[SearchFilterModel]] = None
     category_id: Optional[str] = None
@@ -39,6 +43,7 @@ class ProductSearchRequest(BaseModel):
 
 class StoreSearchRequest(BaseModel):
     """Store search request model"""
+
     query: Optional[str] = None
     filters: Optional[List[SearchFilterModel]] = None
     category: Optional[str] = None
@@ -57,7 +62,7 @@ class StoreSearchRequest(BaseModel):
 async def search_products(request: ProductSearchRequest):
     """
     Search products with advanced filters
-    
+
     - Supports text search
     - Supports custom filters
     - Supports category and store filtering
@@ -72,7 +77,7 @@ async def search_products(request: ProductSearchRequest):
             SearchFilter(field=f.field, operator=f.operator, value=f.value)
             for f in request.filters
         ]
-    
+
     result = await advanced_search_service.search_products(
         query=request.query,
         filters=filters,
@@ -86,7 +91,7 @@ async def search_products(request: ProductSearchRequest):
         page=request.page,
         limit=request.limit,
     )
-    
+
     return result
 
 
@@ -94,7 +99,7 @@ async def search_products(request: ProductSearchRequest):
 async def search_stores(request: StoreSearchRequest):
     """
     Search stores with advanced filters
-    
+
     - Supports text search
     - Supports custom filters
     - Supports category/industry filtering
@@ -110,7 +115,7 @@ async def search_stores(request: StoreSearchRequest):
             SearchFilter(field=f.field, operator=f.operator, value=f.value)
             for f in request.filters
         ]
-    
+
     result = await advanced_search_service.search_stores(
         query=request.query,
         filters=filters,
@@ -125,7 +130,7 @@ async def search_stores(request: StoreSearchRequest):
         page=request.page,
         limit=request.limit,
     )
-    
+
     return result
 
 
@@ -136,12 +141,12 @@ async def get_suggestions(
 ):
     """
     Get search suggestions
-    
+
     - Returns product and store name suggestions
     - Based on partial query match
     """
     suggestions = await advanced_search_service.get_search_suggestions(query, limit)
-    
+
     return {"suggestions": suggestions}
 
 
@@ -149,11 +154,11 @@ async def get_suggestions(
 async def get_filter_options():
     """
     Get available filter options
-    
+
     - Returns available categories
     - Returns price range
     - Returns available industries
     """
     options = await advanced_search_service.get_filter_options()
-    
+
     return options

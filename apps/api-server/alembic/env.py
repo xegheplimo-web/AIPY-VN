@@ -12,7 +12,7 @@ import os
 # Add the src directory to the path so we can import models
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from src.db import Base
+from src.database import Base
 from src.models.store import Store, Product, Category
 from src.models.order import Cart, CartItem, Order, OrderItem, ProductVariant
 from src.models.user import User, Address
@@ -22,6 +22,13 @@ from src.models.review import Review
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Override database URL from environment for container compatibility
+db_url = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/vietstore"
+)
+config.set_main_option("sqlalchemy.url", db_url)
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

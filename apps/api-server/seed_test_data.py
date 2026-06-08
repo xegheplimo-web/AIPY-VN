@@ -12,6 +12,7 @@ from src.models.store import Store, Product, Category
 from src.models.order import Order, OrderItem
 from src.models.promotion import Promotion
 from src.models.report import Report
+from src.api.auth import hash_password
 
 
 async def seed_categories():
@@ -24,7 +25,7 @@ async def seed_categories():
         {"name": "Điện tử", "slug": "dien-tu", "sort_order": 5},
         {"name": "Sức khỏe", "slug": "suc-khoe", "sort_order": 6},
     ]
-    
+
     async with async_session() as session:
         for cat_data in categories_data:
             existing = await session.execute(
@@ -39,30 +40,31 @@ async def seed_categories():
 
 async def seed_users():
     """Seed test users"""
+    password_hash = hash_password("Password123")
     users_data = [
         {
             "email": "customer@example.com",
-            "password_hash": "$2b$12$KIXL/example_hash",  # bcrypt hash
+            "password_hash": password_hash,
             "full_name": "Nguyễn Văn A",
             "phone": "0901234567",
             "role": "customer",
         },
         {
             "email": "owner@example.com",
-            "password_hash": "$2b$12$KIXL/example_hash",
+            "password_hash": password_hash,
             "full_name": "Trần Thị B",
             "phone": "0909876543",
             "role": "owner",
         },
         {
             "email": "admin@example.com",
-            "password_hash": "$2b$12$KIXL/example_hash",
+            "password_hash": password_hash,
             "full_name": "Admin User",
             "phone": "0905555555",
             "role": "admin",
         },
     ]
-    
+
     async with async_session() as session:
         for user_data in users_data:
             existing = await session.execute(
@@ -109,7 +111,7 @@ async def seed_stores():
             "status": "active",
         },
     ]
-    
+
     async with async_session() as session:
         for store_data in stores_data:
             existing = await session.execute(
@@ -128,15 +130,15 @@ async def seed_products():
         # Get stores
         stores_result = await session.execute(select(Store))
         stores = stores_result.scalars().all()
-        
+
         # Get categories
         categories_result = await session.execute(select(Category))
         categories = categories_result.scalars().all()
-        
+
         if not stores or not categories:
             print("⚠ No stores or categories found, skipping products")
             return
-        
+
         products_data = [
             {
                 "store_id": stores[0].id,
@@ -175,12 +177,12 @@ async def seed_products():
                 "category_id": categories[4].id,
             },
         ]
-        
+
         for product_data in products_data:
             existing = await session.execute(
                 select(Product).where(
                     Product.name == product_data["name"],
-                    Product.store_id == product_data["store_id"]
+                    Product.store_id == product_data["store_id"],
                 )
             )
             if not existing.scalar_one_or_none():
@@ -216,7 +218,7 @@ async def seed_promotions():
             "applicable_stores": ["all"],
         },
     ]
-    
+
     async with async_session() as session:
         for promo_data in promotions_data:
             existing = await session.execute(
@@ -235,11 +237,11 @@ async def seed_reports():
         # Get users
         users_result = await session.execute(select(User))
         users = users_result.scalars().all()
-        
+
         if not users:
             print("⚠ No users found, skipping reports")
             return
-        
+
         reports_data = [
             {
                 "type": "store",
@@ -252,12 +254,12 @@ async def seed_reports():
                 "status": "pending",
             },
         ]
-        
+
         for report_data in reports_data:
             existing = await session.execute(
                 select(Report).where(
                     Report.target_id == report_data["target_id"],
-                    Report.reporter_id == report_data["reporter_id"]
+                    Report.reporter_id == report_data["reporter_id"],
                 )
             )
             if not existing.scalar_one_or_none():
