@@ -18,32 +18,42 @@ export default function ProductManagementPage() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [storeId, setStoreId] = useState<string>('');
   const [form, setForm] = useState({
     name: '',
     price: '',
     stock: '0',
-    unit: 'cai',
+    unit: 'cái',
     barcode: '',
     brand: '',
     shelf_location: '',
   });
 
   useEffect(() => {
-    loadProducts();
+    // Try to get store_id from settings or localStorage
+    const savedStoreId = localStorage.getItem('owner_store_id') || '';
+    setStoreId(savedStoreId);
+    if (savedStoreId) {
+      loadProducts(savedStoreId);
+    }
   }, []);
 
-  const loadProducts = async () => {
+  const loadProducts = async (sid: string) => {
     try {
-      const res = await api.get('/owner/products?store_id=store-1&limit=100');
-      setProducts(res.data.products || []);
+      const res: any = await api.get(`/owner/products?store_id=${sid}&limit=100`);
+      setProducts(res.products || res.data?.products || []);
     } catch (err) {
       console.error('Failed to load products:', err);
     }
   };
 
   const handleAdd = async () => {
+    if (!storeId) {
+      alert('Vui lòng chọn cửa hàng trước');
+      return;
+    }
     try {
-      await api.post('/owner/products?store_id=store-1', {
+      await api.post(`/owner/products?store_id=${storeId}`, {
         name: form.name,
         price: parseFloat(form.price),
         stock: parseInt(form.stock),
@@ -57,22 +67,23 @@ export default function ProductManagementPage() {
         name: '',
         price: '',
         stock: '0',
-        unit: 'cai',
+        unit: 'cái',
         barcode: '',
         brand: '',
         shelf_location: '',
       });
-      loadProducts();
+      loadProducts(storeId);
     } catch (err) {
       alert('Thêm sản phẩm thất bại!');
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!storeId) return;
     if (!confirm('Bạn chắc chắn muốn xóa?')) return;
     try {
-      await api.delete(`/owner/products/${id}?store_id=store-1`);
-      loadProducts();
+      await api.delete(`/owner/products/${id}?store_id=${storeId}`);
+      loadProducts(storeId);
     } catch (err) {
       alert('Xóa thất bại!');
     }
@@ -155,13 +166,43 @@ export default function ProductManagementPage() {
               <Upload className="w-4 h-4" /> Bulk Upload
             </button>
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                if (!storeId) {
+                  const sid = prompt('Nhập store ID:');
+                  if (sid) {
+                    localStorage.setItem('owner_store_id', sid);
+                    setStoreId(sid);
+                    loadProducts(sid);
+                  }
+                  return;
+                }
+                setShowAddModal(true);
+              }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" /> Thêm sản phẩm
             </button>
           </div>
         </div>
+
+        {!storeId && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center mb-6">
+            <p className="text-yellow-800">Chưa có cửa hàng được chọn. Vui lòng nhập store ID để quản lý sản phẩm.</p>
+            <button
+              onClick={() => {
+                const sid = prompt('Nhập store ID:');
+                if (sid) {
+                  localStorage.setItem('owner_store_id', sid);
+                  setStoreId(sid);
+                  loadProducts(sid);
+                }
+              }}
+              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg"
+            >
+              Chọn cửa hàng
+            </button>
+          </div>
+        )}
 
         <DataTable columns={columns} data={products} searchKey="name" />
 

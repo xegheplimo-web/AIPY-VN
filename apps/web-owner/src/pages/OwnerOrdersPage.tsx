@@ -17,12 +17,12 @@ interface Order {
 
 const STATUS_TABS = ['all', 'pending', 'confirmed', 'preparing', 'ready', 'completed'];
 const STATUS_LABELS: Record<string, string> = {
-  all: 'Tat ca',
-  pending: 'Cho xac nhan',
-  confirmed: 'Da xac nhan',
-  preparing: 'Dang chuan bi',
-  ready: 'San sang',
-  completed: 'Hoan thanh',
+  all: 'Tất cả',
+  pending: 'Chờ xác nhận',
+  confirmed: 'Đã xác nhận',
+  preparing: 'Đang chuẩn bị',
+  ready: 'Sẵn sàng',
+  completed: 'Hoàn thành',
 };
 
 export default function OwnerOrdersPage() {
@@ -43,11 +43,10 @@ export default function OwnerOrdersPage() {
       }
       const response = await api.getOrders(params);
 
-      // Transform API response to match interface
-      const transformed = response.orders.map((order: any) => ({
+      const transformed = (response.orders || []).map((order: any) => ({
         id: order.id,
         order_number: order.order_number || `ORD-${order.id}`,
-        customer: order.customer_name || order.customer || 'Unknown',
+        customer: order.customer_name || order.customer || 'Không rõ',
         total: order.total?.toLocaleString('vi-VN') || '0',
         status: order.status || 'pending',
         date: new Date(order.created_at || Date.now()).toLocaleDateString('vi-VN'),
@@ -79,20 +78,20 @@ export default function OwnerOrdersPage() {
   const columns: ColumnDef<Order>[] = [
     {
       accessorKey: 'order_number',
-      header: 'Ma don hang',
+      header: 'Mã đơn hàng',
       cell: ({ row }) => <div className="font-medium">{row.getValue('order_number')}</div>,
     },
     {
       accessorKey: 'customer',
-      header: 'Khach hang',
+      header: 'Khách hàng',
     },
     {
       accessorKey: 'date',
-      header: 'Ngay dat',
+      header: 'Ngày đặt',
     },
     {
       accessorKey: 'items',
-      header: 'San pham',
+      header: 'Sản phẩm',
       cell: ({ row }) => (
         <div className="text-sm text-gray-600 max-w-xs truncate">
           {row.getValue('items').join(', ')}
@@ -101,12 +100,12 @@ export default function OwnerOrdersPage() {
     },
     {
       accessorKey: 'total',
-      header: 'Tong tien',
+      header: 'Tổng tiền',
       cell: ({ row }) => <div className="font-bold text-blue-600">{row.getValue('total')}đ</div>,
     },
     {
       accessorKey: 'status',
-      header: 'Trang thai',
+      header: 'Trạng thái',
       cell: ({ row }) => (
         <span
           className={`text-xs px-2 py-1 rounded-full ${
@@ -125,7 +124,7 @@ export default function OwnerOrdersPage() {
     },
     {
       id: 'actions',
-      header: 'Hanh dong',
+      header: 'Hành động',
       cell: ({ row }) => {
         const status = row.getValue('status');
         return (
@@ -136,13 +135,13 @@ export default function OwnerOrdersPage() {
                   onClick={() => updateStatus(row.original.id, 'confirmed')}
                   className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg flex items-center gap-1"
                 >
-                  <Check className="w-4 h-4" /> Chap nhan
+                  <Check className="w-4 h-4" /> Chấp nhận
                 </button>
                 <button
                   onClick={() => updateStatus(row.original.id, 'cancelled')}
                   className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg flex items-center gap-1"
                 >
-                  <X className="w-4 h-4" /> Tu choi
+                  <X className="w-4 h-4" /> Từ chối
                 </button>
               </>
             )}
@@ -151,7 +150,7 @@ export default function OwnerOrdersPage() {
                 onClick={() => updateStatus(row.original.id, 'preparing')}
                 className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg flex items-center gap-1"
               >
-                <Truck className="w-4 h-4" /> Bat dau chuan bi
+                <Truck className="w-4 h-4" /> Bắt đầu chuẩn bị
               </button>
             )}
             {status === 'preparing' && (
@@ -159,7 +158,7 @@ export default function OwnerOrdersPage() {
                 onClick={() => updateStatus(row.original.id, 'ready')}
                 className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg"
               >
-                San sang giao
+                Sẵn sàng giao
               </button>
             )}
           </div>
@@ -171,7 +170,7 @@ export default function OwnerOrdersPage() {
   if (loading) {
     return (
       <div className="min-h-screen p-4 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
       </div>
     );
   }
@@ -179,7 +178,7 @@ export default function OwnerOrdersPage() {
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Quan ly don hang</h1>
+        <h1 className="text-2xl font-bold mb-6">Quản lý đơn hàng</h1>
 
         <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
           {STATUS_TABS.map((tab) => (
