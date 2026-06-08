@@ -304,11 +304,19 @@ class ApiService {
   }
 
   async post<T>(endpoint: string, body?: any, options?: RequestConfig): Promise<T> {
-    return this.request<T>(endpoint, { ...options, method: 'POST', body: body ? JSON.stringify(body) : undefined });
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
   }
 
   async put<T>(endpoint: string, body?: any, options?: RequestConfig): Promise<T> {
-    return this.request<T>(endpoint, { ...options, method: 'PUT', body: body ? JSON.stringify(body) : undefined });
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+    });
   }
 
   async delete<T>(endpoint: string, options?: RequestConfig): Promise<T> {
@@ -386,7 +394,11 @@ class ApiService {
     return this.request<Product[]>(`/api/stores/${storeId}/products`);
   }
 
-  async getProductOffers(productId: string, lat?: number, lng?: number): Promise<{
+  async getProductOffers(
+    productId: string,
+    lat?: number,
+    lng?: number
+  ): Promise<{
     offers: Array<{
       store_id: string;
       store_name: string;
@@ -560,6 +572,44 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  // Payments v2 - Multi-gateway
+  async createPayment(data: {
+    order_id: string;
+    gateway: 'stripe' | 'vnpay' | 'momo' | 'zalopay' | 'cod';
+    amount: number;
+    currency?: string;
+    description?: string;
+    return_url?: string;
+    cancel_url?: string;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    transaction_id: string;
+    gateway_url: string | null;
+  }> {
+    return this.request('/api/v1/payments/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyPayment(
+    gateway: string,
+    queryParams: Record<string, string>
+  ): Promise<{
+    success: boolean;
+    message: string;
+    status: string;
+    transaction_id: string;
+  }> {
+    const query = new URLSearchParams(queryParams);
+    return this.request(`/api/v1/payments/verify/${gateway}?${query}`);
+  }
+
+  async getPaymentTransactions(orderId: string): Promise<any[]> {
+    return this.request<any[]>(`/api/v1/payments/transactions/${orderId}`);
   }
 }
 

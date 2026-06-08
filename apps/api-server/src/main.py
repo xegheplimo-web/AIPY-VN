@@ -14,6 +14,7 @@ from src.api import (
     orders,
     owner,
     payments,
+    payments_v2,
     products,
     promotions,
     reports,
@@ -225,6 +226,7 @@ app.include_router(voice, prefix=api_v1_prefix)
 app.include_router(notifications, prefix=api_v1_prefix)
 app.include_router(tasks, prefix=api_v1_prefix)
 app.include_router(payments, prefix=api_v1_prefix)
+app.include_router(payments_v2, prefix=api_v1_prefix)
 app.include_router(promotions, prefix=api_v1_prefix)
 app.include_router(reports, prefix=api_v1_prefix)
 app.include_router(auth_router, prefix=api_v1_prefix)

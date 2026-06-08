@@ -10,6 +10,7 @@ from .chat import Message as ChatMessage
 from .favorite import Favorite
 from .promotion import Promotion
 from .report import Report
+from .payment import PaymentTransaction
 
 __all__ = [
     "User",
@@ -27,4 +28,5 @@ __all__ = [
     "Favorite",
     "Promotion",
     "Report",
+    "PaymentTransaction",
 ]

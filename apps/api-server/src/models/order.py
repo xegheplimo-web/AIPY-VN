@@ -65,6 +65,7 @@ class Order(Base):
     created_at = Column(DateTime, server_default=sa_func.now())
 
     items = relationship("OrderItem", back_populates="order", lazy="selectin")
+    payments = relationship("PaymentTransaction", back_populates="order")
 
     __table_args__ = (
         Index("idx_order_user_id", "user_id"),

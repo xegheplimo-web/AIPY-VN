@@ -4,7 +4,6 @@ Configuration validation and management.
 Validates required environment variables and provides configuration access.
 """
 
-
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -128,6 +127,60 @@ class StripeConfig(BaseModel):
         return bool(self.secret_key and self.publishable_key)
 
 
+class VNPayConfig(BaseModel):
+    """VNPay configuration for payment processing."""
+
+    vnp_TmnCode: str = Field(default="", alias="VNPAY_TMN_CODE")
+    vnp_HashSecret: str = Field(default="", alias="VNPAY_HASH_SECRET")
+    vnp_Url: str = Field(
+        default="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html", alias="VNPAY_URL"
+    )
+    vnp_ReturnUrl: str = Field(default="", alias="VNPAY_RETURN_URL")
+    vnp_Api: str = Field(
+        default="https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
+        alias="VNPAY_API",
+    )
+
+    def is_configured(self) -> bool:
+        """Check if VNPay is properly configured."""
+        return bool(self.vnp_TmnCode and self.vnp_HashSecret)
+
+
+class MoMoConfig(BaseModel):
+    """MoMo configuration for payment processing."""
+
+    partner_code: str = Field(default="", alias="MOMO_PARTNER_CODE")
+    access_key: str = Field(default="", alias="MOMO_ACCESS_KEY")
+    secret_key: str = Field(default="", alias="MOMO_SECRET_KEY")
+    endpoint: str = Field(
+        default="https://test-payment.momo.vn/v2/gateway/api/create",
+        alias="MOMO_ENDPOINT",
+    )
+    return_url: str = Field(default="", alias="MOMO_RETURN_URL")
+    notify_url: str = Field(default="", alias="MOMO_NOTIFY_URL")
+
+    def is_configured(self) -> bool:
+        """Check if MoMo is properly configured."""
+        return bool(self.partner_code and self.access_key and self.secret_key)
+
+
+class ZaloPayConfig(BaseModel):
+    """ZaloPay configuration for payment processing."""
+
+    app_id: str = Field(default="", alias="ZALOPAY_APP_ID")
+    key1: str = Field(default="", alias="ZALOPAY_KEY1")
+    key2: str = Field(default="", alias="ZALOPAY_KEY2")
+    endpoint: str = Field(
+        default="https://sb-openapi.zalopay.vn/v2/create", alias="ZALOPAY_ENDPOINT"
+    )
+    return_url: str = Field(default="", alias="ZALOPAY_RETURN_URL")
+    notify_url: str = Field(default="", alias="ZALOPAY_NOTIFY_URL")
+
+    def is_configured(self) -> bool:
+        """Check if ZaloPay is properly configured."""
+        return bool(self.app_id and self.key1)
+
+
 class SerpAPIConfig(BaseModel):
     """SerpAPI configuration for web search."""
 
@@ -190,6 +243,15 @@ class AppConfig(BaseSettings):
 
     # OpenMap
     openmap: OpenMapConfig = Field(default_factory=OpenMapConfig)
+
+    # VNPay
+    vnpay: VNPayConfig = Field(default_factory=VNPayConfig)
+
+    # MoMo
+    momo: MoMoConfig = Field(default_factory=MoMoConfig)
+
+    # ZaloPay
+    zalopay: ZaloPayConfig = Field(default_factory=ZaloPayConfig)
 
     # JWT
     jwt_access_expire_minutes: int = Field(

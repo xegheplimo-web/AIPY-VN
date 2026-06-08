@@ -8,6 +8,7 @@ from .notifications import router as notifications
 from .orders import router as orders
 from .owner import router as owner
 from .payments import router as payments
+from .payments_v2 import router as payments_v2
 from .products import router as products
 from .profile import router as profile
 from .promotions import router as promotions
@@ -32,6 +33,7 @@ __all__ = [
     "orders",
     "owner",
     "payments",
+    "payments_v2",
     "products",
     "profile",
     "promotions",

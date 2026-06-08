@@ -176,7 +176,8 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       // Create orders for each store
-      const orderPromises = storeGroups.map(async (group) => {
+      const createdOrders: any[] = [];
+      for (const group of storeGroups) {
         const orderData = {
           store_id: group.store.id,
           items: group.items.map((item) => ({
@@ -196,15 +197,43 @@ export default function CheckoutPage() {
           notes: formData.notes,
           payment_method: formData.paymentMethod,
         };
+        const order = await apiService.createOrder(orderData);
+        createdOrders.push(order);
+      }
 
-        return apiService.createOrder(orderData);
+      localStorage.removeItem('cart');
+
+      // If COD, go to orders page
+      if (formData.paymentMethod === 'cod') {
+        navigate('/orders');
+        return;
+      }
+
+      // For online payment, create payment and redirect
+      const totalAmount = createdOrders.reduce((sum, o) => sum + o.total_amount, 0);
+      const firstOrder = createdOrders[0];
+      const returnUrl = window.location.origin + '/orders';
+      const cancelUrl = window.location.origin + '/cart';
+
+      const paymentRes = await apiService.createPayment({
+        order_id: firstOrder.id,
+        gateway: formData.paymentMethod as any,
+        amount: totalAmount,
+        currency: 'VND',
+        description: `Thanh toán đơn hàng ${firstOrder.order_number}`,
+        return_url: returnUrl,
+        cancel_url: cancelUrl,
       });
 
-      await Promise.all(orderPromises);
-      localStorage.removeItem('cart');
-      navigate('/orders');
-    } catch (err) {
-      alert('Đặt hàng thất bại, vui lòng thử lại!');
+      if (paymentRes.success && paymentRes.gateway_url) {
+        window.location.href = paymentRes.gateway_url;
+      } else {
+        alert(paymentRes.message || 'Không thể khởi tạo thanh toán');
+        navigate('/orders');
+      }
+    } catch (err: any) {
+      console.error('Order/Payment error:', err);
+      alert(err?.message || 'Đặt hàng thất bại, vui lòng thử lại!');
     } finally {
       setLoading(false);
     }
@@ -485,14 +514,10 @@ export default function CheckoutPage() {
                 icon: Package,
                 desc: 'Tiền mặt khi nhận hàng',
               },
+              { id: 'vnpay', label: 'VNPay', icon: CreditCard, desc: 'Thẻ ATM/QR VNPay' },
               { id: 'momo', label: 'Ví MoMo', icon: CreditCard, desc: 'Quét mã QR MoMo' },
               { id: 'zalopay', label: 'ZaloPay', icon: CreditCard, desc: 'Quét mã QR ZaloPay' },
-              {
-                id: 'credit_card',
-                label: 'Thẻ tín dụng/Ghi nợ',
-                icon: CreditCard,
-                desc: 'Visa, Mastercard, JCB',
-              },
+              { id: 'stripe', label: 'Thẻ quốc tế', icon: CreditCard, desc: 'Visa, Mastercard, JCB (Stripe)' },
             ].map((method) => (
               <label
                 key={method.id}
@@ -607,11 +632,13 @@ export default function CheckoutPage() {
               <span className="font-medium">
                 {formData.paymentMethod === 'cod'
                   ? 'Thanh toán khi nhận hàng'
-                  : formData.paymentMethod === 'momo'
-                    ? 'Ví MoMo'
-                    : formData.paymentMethod === 'zalopay'
-                      ? 'ZaloPay'
-                      : 'Thẻ tín dụng/Ghi nợ'}
+                  : formData.paymentMethod === 'vnpay'
+                    ? 'VNPay'
+                    : formData.paymentMethod === 'momo'
+                      ? 'Ví MoMo'
+                      : formData.paymentMethod === 'zalopay'
+                        ? 'ZaloPay'
+                        : 'Thẻ quốc tế (Stripe)'}
               </span>
             </div>
           </div>
