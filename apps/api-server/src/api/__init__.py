@@ -19,6 +19,7 @@ from .store_locator import router as store_locator
 from .stores import router as stores
 from .tasks import router as tasks
 from .voice import router as voice
+from .websocket import router as websocket
 
 __all__ = [
     "admin",
@@ -42,4 +43,5 @@ __all__ = [
     "stores",
     "tasks",
     "voice",
+    "websocket",
 ]

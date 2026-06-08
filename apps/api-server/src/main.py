@@ -22,6 +22,7 @@ from src.api import (
     stores,
     tasks,
     voice,
+    websocket,
 )
 from src.api.auth import router as auth_router
 from src.api.categories import router as categories
@@ -205,6 +206,9 @@ app.include_router(favorites, prefix=api_v1_prefix)
 app.include_router(store_locator, prefix=api_v1_prefix)
 app.include_router(geo, prefix=api_v1_prefix)
 
+# WebSocket routes
+app.include_router(websocket)
+
 # Legacy routes (backward compatibility - no prefix)
 app.include_router(search)
 app.include_router(stores)
@@ -233,11 +237,11 @@ app.include_router(geo)
 @app.get("/health")
 async def health_check():
     """Health check endpoint with system status."""
-    from sqlalchemy import text
     from src.cache import cache
-    from src.config import config
-    from src.database import async_session
     from src.vector_db import vector_db
+    from src.config import config
+    from sqlalchemy import text
+    from src.database import async_session
 
     health_status = {
         "status": "ok",
@@ -259,7 +263,7 @@ async def health_check():
         health_status["services"]["database"] = "ok"
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
-        health_status["services"]["database"] = f"error: {e!s}"
+        health_status["services"]["database"] = f"error: {str(e)}"
         health_status["status"] = "degraded"
 
     # Test PostGIS
