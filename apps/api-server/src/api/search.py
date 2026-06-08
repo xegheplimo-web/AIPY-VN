@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from src.database import async_session
-from src.models.store import Product
+from src.models.store import Category, Product
 from src.services.geo import haversine_distance
 
 router = APIRouter(prefix="/api", tags=["Search"])
@@ -77,7 +77,19 @@ async def chat_search(req: ChatSearchRequest):
                 store_products[store_id] = {"store": p.store, "products": []}
             store_products[store_id]["products"].append(p)
 
-        # 3. Calculate distance and filter by radius
+        # 3. Resolve categories for products
+        category_ids = set()
+        for p in products:
+            if p.category_id:
+                category_ids.add(p.category_id)
+
+        category_map = {}
+        if category_ids:
+            cat_stmt = select(Category).where(Category.id.in_(category_ids))
+            cat_result = await session.execute(cat_stmt)
+            category_map = {str(c.id): c.name for c in cat_result.scalars().all()}
+
+        # 4. Calculate distance and filter by radius
         stores_result = []
         user_lat = None
         user_lng = None
@@ -119,7 +131,7 @@ async def chat_search(req: ChatSearchRequest):
                         stock=p.stock,
                         in_stock=p.stock > 0,
                         shelf_location=p.shelf_location or "",
-                        category=None,  # Can be added later
+                        category=category_map.get(str(p.category_id)) if p.category_id else None,
                     )
                 )
 
@@ -141,13 +153,13 @@ async def chat_search(req: ChatSearchRequest):
                 )
             )
 
-        # 4. Sort by distance (nearest first)
+        # 5. Sort by distance (nearest first)
         stores_result.sort(key=lambda x: x.distance_m if x.distance_m else float("inf"))
 
-        # 5. Apply limit
+        # 6. Apply limit
         stores_result = stores_result[: req.limit]
 
-        # 6. Build summary
+        # 7. Build summary
         total = len(stores_result)
         if total == 0:
             summary = f"Khong tim thay '{req.query}' trong ban kinh {req.radius_km}km. Ban thu tim tu khoa khac nhe!"

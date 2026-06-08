@@ -29,10 +29,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('auth_token');
     if (token) {
       apiService.setToken(token);
-      // TODO: Validate token and get user info
-      setUser({ id: '1', email: 'owner@example.com', name: 'Owner', phone: null, role: 'owner' });
+      // Fetch real user info from API
+      apiService.getProfile().then((profile) => {
+        const userData = {
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          phone: profile.phone,
+          role: profile.role || 'owner',
+        };
+        setUser(userData);
+        // Store store_id if available
+        if (profile.store_id) {
+          localStorage.setItem('store_id', profile.store_id);
+        }
+      }).catch(() => {
+        // Token is invalid, clear it
+        apiService.clearToken();
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('store_id');
+      }).finally(() => {
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -40,6 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await apiService.login(email, password);
       apiService.setToken(response.access_token);
       setUser(response.user);
+      // Store store_id if available from login response
+      if (response.user?.store_id) {
+        localStorage.setItem('store_id', response.user.store_id);
+      }
     } catch (error) {
       throw error;
     }
@@ -58,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     apiService.logout();
     setUser(null);
+    localStorage.removeItem('store_id');
   };
 
   return (

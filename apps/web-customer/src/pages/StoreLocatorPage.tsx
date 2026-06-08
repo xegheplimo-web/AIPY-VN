@@ -8,27 +8,18 @@ import { Card } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { ScrollArea } from '../components/ui/scroll-area';
 
-interface Store {
+interface LocatorStore {
   id: string;
   name: string;
   lat: number;
   lng: number;
   address: string;
   phone?: string;
-  category?: {
-    name: string;
-    icon: string;
-  };
-  brand?: {
-    name: string;
-    logo?: string;
-  };
+  category?: { name: string; icon: string };
+  brand?: { name: string; logo?: string };
   rating?: number;
   review_count?: number;
-  distance?: {
-    meters: number;
-    text: string;
-  };
+  distance?: { meters: number; text: string };
   opening_hours?: any;
   images?: string[];
 }
@@ -48,8 +39,8 @@ interface Brand {
 }
 
 export default function StoreLocatorPage() {
-  const [stores, setStores] = useState<Store[]>([]);
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [stores, setStores] = useState<LocatorStore[]>([]);
+  const [selectedStore, setSelectedStore] = useState<LocatorStore | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -60,7 +51,6 @@ export default function StoreLocatorPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
 
-  // Get user location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -73,6 +63,8 @@ export default function StoreLocatorPage() {
         { enableHighAccuracy: true, timeout: 10000 }
       );
     }
+    loadCategories();
+    loadBrands();
   }, []);
 
   // Load categories
@@ -91,7 +83,6 @@ export default function StoreLocatorPage() {
       .catch((err) => console.error('Failed to load brands:', err));
   }, []);
 
-  // Search nearby stores
   const searchNearby = async () => {
     if (!userLocation) {
       alert('Vui lòng cho phép truy cập vị trí GPS');
@@ -100,11 +91,13 @@ export default function StoreLocatorPage() {
 
     setLoading(true);
     try {
-      const params = new URLSearchParams({
+      const params: any = {
         lat: userLocation[0].toString(),
         lng: userLocation[1].toString(),
         radius: radius.toString(),
-      });
+      };
+      if (selectedCategory) params.category = selectedCategory;
+      if (selectedBrand) params.brand = selectedBrand;
 
       if (selectedCategory) params.append('category', selectedCategory);
       if (selectedBrand) params.append('brand', selectedBrand);
@@ -118,17 +111,16 @@ export default function StoreLocatorPage() {
     }
   };
 
-  // Search by text
   const handleSearch = async (query: string) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ q: query });
+      const params: any = { q: query };
       if (userLocation) {
-        params.append('lat', userLocation[0].toString());
-        params.append('lng', userLocation[1].toString());
+        params.lat = userLocation[0].toString();
+        params.lng = userLocation[1].toString();
       }
-      if (selectedCategory) params.append('category', selectedCategory);
-      if (selectedBrand) params.append('brand', selectedBrand);
+      if (selectedCategory) params.category = selectedCategory;
+      if (selectedBrand) params.brand = selectedBrand;
 
       const data = await apiService.get(`/api/geo/search?${params}`);
       setStores(data.stores || []);
@@ -139,7 +131,6 @@ export default function StoreLocatorPage() {
     }
   };
 
-  // Get current location
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -154,7 +145,6 @@ export default function StoreLocatorPage() {
     }
   };
 
-  // Clear filters
   const clearFilters = () => {
     setSelectedCategory(null);
     setSelectedBrand(null);
@@ -167,7 +157,7 @@ export default function StoreLocatorPage() {
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
-            <h1 className="text-2xl font-bold text-blue-600">VietStore</h1>
+            <h1 className="text-2xl font-bold text-blue-600">AI-SHOP.VN</h1>
             <div className="flex-1 max-w-2xl">
               <GeoAutocomplete
                 onSearch={handleSearch}
@@ -196,7 +186,6 @@ export default function StoreLocatorPage() {
 
               {showFilters && (
                 <div className="space-y-4">
-                  {/* Radius */}
                   <div>
                     <label className="text-sm font-medium mb-2 block">Bán kính</label>
                     <select
@@ -212,7 +201,6 @@ export default function StoreLocatorPage() {
                     </select>
                   </div>
 
-                  {/* Categories */}
                   <div>
                     <label className="text-sm font-medium mb-2 block">Danh mục</label>
                     <ScrollArea className="h-40">
@@ -243,7 +231,6 @@ export default function StoreLocatorPage() {
                     </ScrollArea>
                   </div>
 
-                  {/* Brands */}
                   <div>
                     <label className="text-sm font-medium mb-2 block">Thương hiệu</label>
                     <ScrollArea className="h-40">
@@ -273,11 +260,8 @@ export default function StoreLocatorPage() {
                     </ScrollArea>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex gap-2">
-                    <Button onClick={searchNearby} className="flex-1">
-                      Tìm kiếm
-                    </Button>
+                    <Button onClick={searchNearby} className="flex-1">Tìm kiếm</Button>
                     <Button variant="outline" onClick={clearFilters}>
                       <X className="h-4 w-4" />
                     </Button>
@@ -285,28 +269,12 @@ export default function StoreLocatorPage() {
                 </div>
               )}
 
-              {/* View Toggle */}
               <div className="flex gap-2 mt-4">
-                <Button
-                  variant={viewMode === 'map' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('map')}
-                  className="flex-1"
-                >
-                  Bản đồ
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="flex-1"
-                >
-                  Danh sách
-                </Button>
+                <Button variant={viewMode === 'map' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('map')} className="flex-1">Bản đồ</Button>
+                <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('list')} className="flex-1">Danh sách</Button>
               </div>
             </Card>
 
-            {/* Store List */}
             {viewMode === 'list' && (
               <Card className="mt-4 p-4">
                 <ScrollArea className="h-[calc(100vh-400px)]">
@@ -318,16 +286,10 @@ export default function StoreLocatorPage() {
                         className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                       >
                         <div className="flex items-start gap-3">
-                          {store.category?.icon && (
-                            <span className="text-2xl">{store.category.icon}</span>
-                          )}
+                          {store.category?.icon && <span className="text-2xl">{store.category.icon}</span>}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium text-gray-900">{store.name}</h3>
-                            {store.brand && (
-                              <Badge variant="secondary" className="mt-1">
-                                {store.brand.name}
-                              </Badge>
-                            )}
+                            {store.brand && <Badge variant="secondary" className="mt-1">{store.brand.name}</Badge>}
                             <p className="text-sm text-gray-600 mt-1">{store.address}</p>
                             {store.distance && (
                               <div className="text-sm text-blue-600 mt-1">
@@ -350,9 +312,7 @@ export default function StoreLocatorPage() {
                       </div>
                     ))}
                     {stores.length === 0 && !loading && (
-                      <div className="text-center py-8 text-gray-500">
-                        Không tìm thấy cửa hàng nào
-                      </div>
+                      <div className="text-center py-8 text-gray-500">Không tìm thấy cửa hàng nào</div>
                     )}
                   </div>
                 </ScrollArea>
@@ -360,7 +320,6 @@ export default function StoreLocatorPage() {
             )}
           </aside>
 
-          {/* Map */}
           <main className="flex-1">
             <Card className="overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
               {viewMode === 'map' ? (
@@ -372,23 +331,18 @@ export default function StoreLocatorPage() {
                   onStoreClick={setSelectedStore}
                 />
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">
-                  Chọn chế độ bản đồ để xem
-                </div>
+                <div className="h-full flex items-center justify-center text-gray-500">Chọn chế độ bản đồ để xem</div>
               )}
             </Card>
           </main>
         </div>
       </div>
 
-      {/* Store Detail Dialog */}
       <Dialog open={!!selectedStore} onOpenChange={() => setSelectedStore(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              {selectedStore?.category?.icon && (
-                <span className="text-3xl">{selectedStore.category.icon}</span>
-              )}
+              {selectedStore?.category?.icon && <span className="text-3xl">{selectedStore.category.icon}</span>}
               {selectedStore?.name}
             </DialogTitle>
           </DialogHeader>
@@ -400,33 +354,25 @@ export default function StoreLocatorPage() {
                 <MapPin className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <p>{selectedStore.address}</p>
               </div>
-
               {selectedStore.distance && (
                 <div className="flex items-center gap-2 text-blue-600">
                   <Navigation className="h-5 w-5" />
                   <span className="font-medium">{selectedStore.distance.text}</span>
                 </div>
               )}
-
               {selectedStore.phone && (
                 <div className="flex items-center gap-2 text-gray-600">
                   <Phone className="h-5 w-5" />
-                  <a href={`tel:${selectedStore.phone}`} className="hover:text-blue-600">
-                    {selectedStore.phone}
-                  </a>
+                  <a href={`tel:${selectedStore.phone}`} className="hover:text-blue-600">{selectedStore.phone}</a>
                 </div>
               )}
-
               {selectedStore.rating && (
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
                   <span className="font-medium">{selectedStore.rating}</span>
-                  {selectedStore.review_count && (
-                    <span className="text-gray-500">({selectedStore.review_count} đánh giá)</span>
-                  )}
+                  {selectedStore.review_count && <span className="text-gray-500">({selectedStore.review_count} đánh giá)</span>}
                 </div>
               )}
-
               {selectedStore.opening_hours && (
                 <div className="flex items-start gap-2 text-gray-600">
                   <Clock className="h-5 w-5 flex-shrink-0 mt-0.5" />
@@ -438,20 +384,13 @@ export default function StoreLocatorPage() {
                   </div>
                 </div>
               )}
-
               {selectedStore.images && selectedStore.images.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {selectedStore.images.map((img, idx) => (
-                    <img
-                      key={idx}
-                      src={img}
-                      alt={`${selectedStore.name} ${idx + 1}`}
-                      className="rounded-lg w-full h-24 object-cover"
-                    />
+                    <img key={idx} src={img} alt={`${selectedStore.name} ${idx + 1}`} className="rounded-lg w-full h-24 object-cover" />
                   ))}
                 </div>
               )}
-
               <div className="flex gap-2 pt-4">
                 <Button className="flex-1">Chỉ đường</Button>
                 <Button variant="outline" className="flex-1">

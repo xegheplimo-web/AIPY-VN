@@ -1,6 +1,7 @@
 import { Eye, EyeOff, Store } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
 export default function OwnerLoginPage() {
   const navigate = useNavigate();
@@ -8,14 +9,21 @@ export default function OwnerLoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError('');
+
+    try {
+      await api.login(email, password);
       navigate('/dashboard');
-    }, 1000);
+    } catch (err: any) {
+      setError(err.message || 'Đăng nhập thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -27,7 +35,13 @@ export default function OwnerLoginPage() {
           </div>
         </div>
         <h1 className="text-2xl font-bold text-center mb-2">Owner Portal</h1>
-        <p className="text-gray-500 text-center mb-6">Dang nhap de quan ly cua hang</p>
+        <p className="text-gray-500 text-center mb-6">Đăng nhập để quản lý cửa hàng</p>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -42,7 +56,7 @@ export default function OwnerLoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Mat khau</label>
+            <label className="block text-sm font-medium mb-1">Mật khẩu</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -66,14 +80,14 @@ export default function OwnerLoginPage() {
             disabled={loading}
             className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? 'Dang xu ly...' : 'Dang nhap'}
+            {loading ? 'Đang xử lý...' : 'Đăng nhập'}
           </button>
         </form>
 
         <p className="text-center mt-4 text-sm text-gray-500">
-          Chua co tai khoan?{' '}
+          Chưa có tài khoản?{' '}
           <button onClick={() => navigate('/register')} className="text-blue-600 hover:underline">
-            Dang ky cua hang
+            Đăng ký cửa hàng
           </button>
         </p>
       </div>

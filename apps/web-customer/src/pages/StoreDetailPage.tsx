@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Phone, MessageCircle, Star, Clock, Store, ShoppingCart, Plus } from 'lucide-react';
-import { apiService } from '../services/api';
+import apiService from '../services/api';
 import type { Store as StoreType, Product } from '../services/api';
 
 export default function StoreDetailPage() {
@@ -24,7 +24,7 @@ export default function StoreDetailPage() {
         apiService.getStoreProducts(storeId),
       ]);
       setStore(storeData);
-      setProducts(productsData);
+      setProducts(productsData || []);
     } catch (err) {
       console.error('Failed to load store detail:', err);
     } finally {

@@ -139,7 +139,7 @@ async def list_promotions(
                     end_date=p.end_date,
                     status=p.status,
                     applicable_stores=p.applicable_stores or [],
-                    created_at=p.created_at,
+                    created_at=str(p.created_at) if p.created_at else None,
                 )
                 for p in promotions
             ],
@@ -209,7 +209,7 @@ async def create_promotion(
             end_date=new_promotion.end_date,
             status=new_promotion.status,
             applicable_stores=new_promotion.applicable_stores or [],
-            created_at=new_promotion.created_at,
+            created_at=str(new_promotion.created_at) if new_promotion.created_at else None,
         )
 
 
@@ -245,7 +245,7 @@ async def get_promotion(
             end_date=promotion.end_date,
             status=promotion.status,
             applicable_stores=promotion.applicable_stores or [],
-            created_at=promotion.created_at,
+            created_at=str(promotion.created_at) if promotion.created_at else None,
         )
 
 
@@ -310,7 +310,7 @@ async def update_promotion(
             end_date=db_promotion.end_date,
             status=db_promotion.status,
             applicable_stores=db_promotion.applicable_stores or [],
-            created_at=db_promotion.created_at,
+            created_at=str(db_promotion.created_at) if db_promotion.created_at else None,
         )
 
 

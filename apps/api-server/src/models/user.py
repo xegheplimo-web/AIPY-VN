@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Text, ForeignKey, Index
+from sqlalchemy import Column, String, Boolean, Text, ForeignKey, Index, DateTime, func as sa_func
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -20,8 +20,8 @@ class User(Base):
     last_login_at = Column(String)
     fcm_token = Column(String(500))  # Firebase Cloud Messaging token
     fcm_platform = Column(String(20))  # Platform: web, ios, android
-    created_at = Column(String, default="now()")
-    updated_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())
 
     __table_args__ = (
         Index("idx_user_email", "email"),
@@ -44,4 +44,5 @@ class Address(Base):
     latitude = Column(String)
     longitude = Column(String)
     is_default = Column(Boolean, default=False)
-    created_at = Column(String, default="now()")
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())

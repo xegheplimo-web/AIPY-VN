@@ -504,3 +504,8 @@ class GeoCacheService:
 
 # Global instance
 geo_cache = GeoCacheService()
+
+
+def get_geo_cache() -> GeoCacheService:
+    """Get the global geo cache service instance."""
+    return geo_cache

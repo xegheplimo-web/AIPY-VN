@@ -4,8 +4,7 @@ Favorite/Wishlist model for VietStore RAG.
 Users can save products to their favorites list for quick access.
 """
 
-from datetime import datetime
-from sqlalchemy import Column, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, Index, String, UniqueConstraint, DateTime, func as sa_func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -25,7 +24,7 @@ class Favorite(Base):
     product_id = Column(
         UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False
     )
-    created_at = Column(String, default=lambda: datetime.now().isoformat())
+    created_at = Column(DateTime, server_default=sa_func.now())
 
     # Relationships
     user = relationship("User", backref="favorites")

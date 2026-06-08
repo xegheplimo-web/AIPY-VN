@@ -5,6 +5,8 @@ from sqlalchemy import (
     ForeignKey,
     JSON,
     Index,
+    DateTime,
+    func as sa_func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -27,8 +29,9 @@ class Report(Base):
     evidence = Column(JSON)  # Array of file URLs
     resolution_notes = Column(Text)
     resolved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    resolved_at = Column(String)
-    created_at = Column(String, default="now()")
+    resolved_at = Column(DateTime)
+    created_at = Column(DateTime, server_default=sa_func.now())
+    updated_at = Column(DateTime, server_default=sa_func.now(), onupdate=sa_func.now())
 
     __table_args__ = (
         Index("idx_report_type", "type"),

@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from src.database import async_session
+from src.middleware.auth_middleware import require_auth
 from src.models.order import Cart, CartItem
 from src.models.store import Product
 
@@ -65,13 +66,13 @@ class RemoveCartItemResponse(BaseModel):
 
 
 @router.get("/", response_model=CartResponse)
-async def get_cart(user_id: str | None = None):
+async def get_cart(current_user=Depends(require_auth)):
+    user_id = str(current_user["id"])
     async with async_session() as session:
-        # For now, get the active cart (in real app, filter by user_id)
-        cart_stmt = select(Cart).where(Cart.status == "active")
-        if user_id:
-            cart_stmt = cart_stmt.where(Cart.user_id == uuid.UUID(user_id))
-        cart_stmt = cart_stmt.order_by(Cart.created_at.desc()).limit(1)
+        cart_stmt = select(Cart).where(
+            Cart.user_id == uuid.UUID(user_id),
+            Cart.status == "active",
+        ).order_by(Cart.created_at.desc()).limit(1)
 
         cart_result = await session.execute(cart_stmt)
         cart = cart_result.scalar_one_or_none()
@@ -125,7 +126,8 @@ async def get_cart(user_id: str | None = None):
 
 
 @router.post("/items", response_model=AddCartItemResponse)
-async def add_to_cart(data: AddCartItemRequest, user_id: str | None = None):
+async def add_to_cart(data: AddCartItemRequest, current_user=Depends(require_auth)):
+    user_id = str(current_user["id"])
     async with async_session() as session:
         # Get product
         product_stmt = select(Product).where(Product.id == uuid.UUID(data.product_id))
@@ -139,10 +141,10 @@ async def add_to_cart(data: AddCartItemRequest, user_id: str | None = None):
             raise HTTPException(status_code=400, detail="Not enough stock")
 
         # Get or create cart
-        cart_stmt = select(Cart).where(Cart.status == "active")
-        if user_id:
-            cart_stmt = cart_stmt.where(Cart.user_id == uuid.UUID(user_id))
-        cart_stmt = cart_stmt.order_by(Cart.created_at.desc()).limit(1)
+        cart_stmt = select(Cart).where(
+            Cart.user_id == uuid.UUID(user_id),
+            Cart.status == "active",
+        ).order_by(Cart.created_at.desc()).limit(1)
 
         cart_result = await session.execute(cart_stmt)
         cart = cart_result.scalar_one_or_none()
@@ -150,7 +152,7 @@ async def add_to_cart(data: AddCartItemRequest, user_id: str | None = None):
         if not cart:
             cart = Cart(
                 id=uuid.uuid4(),
-                user_id=uuid.UUID(user_id) if user_id else None,
+                user_id=uuid.UUID(user_id),
                 store_id=product.store_id,
                 status="active",
             )
@@ -202,9 +204,16 @@ async def add_to_cart(data: AddCartItemRequest, user_id: str | None = None):
 
 
 @router.put("/items/{item_id}", response_model=UpdateCartItemResponse)
-async def update_cart_item(item_id: str, data: UpdateCartItemRequest):
+async def update_cart_item(item_id: str, data: UpdateCartItemRequest, current_user=Depends(require_auth)):
+    user_id = str(current_user["id"])
     async with async_session() as session:
-        stmt = select(CartItem).where(CartItem.id == uuid.UUID(item_id))
+        # Verify the cart item belongs to the user
+        stmt = (
+            select(CartItem)
+            .join(Cart, CartItem.cart_id == Cart.id)
+            .where(CartItem.id == uuid.UUID(item_id))
+            .where(Cart.user_id == uuid.UUID(user_id))
+        )
         result = await session.execute(stmt)
         item = result.scalar_one_or_none()
 
@@ -231,9 +240,16 @@ async def update_cart_item(item_id: str, data: UpdateCartItemRequest):
 
 
 @router.delete("/items/{item_id}", response_model=RemoveCartItemResponse)
-async def remove_from_cart(item_id: str):
+async def remove_from_cart(item_id: str, current_user=Depends(require_auth)):
+    user_id = str(current_user["id"])
     async with async_session() as session:
-        stmt = select(CartItem).where(CartItem.id == uuid.UUID(item_id))
+        # Verify the cart item belongs to the user
+        stmt = (
+            select(CartItem)
+            .join(Cart, CartItem.cart_id == Cart.id)
+            .where(CartItem.id == uuid.UUID(item_id))
+            .where(Cart.user_id == uuid.UUID(user_id))
+        )
         result = await session.execute(stmt)
         item = result.scalar_one_or_none()
 
@@ -248,3 +264,26 @@ async def remove_from_cart(item_id: str):
             status="removed",
             message="Item removed from cart",
         )
+
+
+@router.delete("/", response_model=dict)
+async def clear_cart(current_user=Depends(require_auth)):
+    user_id = str(current_user["id"])
+    async with async_session() as session:
+        cart_stmt = select(Cart).where(
+            Cart.user_id == uuid.UUID(user_id),
+            Cart.status == "active",
+        )
+        cart_result = await session.execute(cart_stmt)
+        cart = cart_result.scalar_one_or_none()
+
+        if cart:
+            # Delete all cart items
+            items_stmt = select(CartItem).where(CartItem.cart_id == cart.id)
+            items_result = await session.execute(items_stmt)
+            items = items_result.scalars().all()
+            for item in items:
+                await session.delete(item)
+            await session.commit()
+
+        return {"status": "cleared", "message": "Cart cleared successfully"}

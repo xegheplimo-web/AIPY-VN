@@ -110,7 +110,7 @@ async def list_favorites(current_user: User = Depends(require_auth)):
                     price=float(product.price) if product.price else 0.0,
                     image_url=image_url,
                     store_name=store_name,
-                    added_at=fav.created_at,
+                    added_at=str(fav.created_at) if fav.created_at else None,
                 )
             )
 
