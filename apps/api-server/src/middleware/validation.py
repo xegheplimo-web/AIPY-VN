@@ -7,7 +7,7 @@ Validates incoming requests for security and data integrity.
 import json
 import logging
 from typing import Callable
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 

@@ -8,7 +8,6 @@ for Vietnam geographic data (provinces, districts, wards, stores, brands, catego
 import logging
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

@@ -12,10 +12,10 @@ import os
 import json
 import base64
 import logging
-from typing import Tuple, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, utils
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend

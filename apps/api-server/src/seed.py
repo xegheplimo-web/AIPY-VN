@@ -21,7 +21,6 @@ if sys.platform == "win32":
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.store import Store, Product, Category
-from src.models.user import User
 from src.config import config
 
 logger = logging.getLogger(__name__)

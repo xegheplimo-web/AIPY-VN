@@ -8,7 +8,6 @@ to improve performance and reduce database load.
 import json
 import logging
 from typing import Optional, Any, Dict, List
-from datetime import timedelta
 
 from src.cache import cache
 

@@ -14,7 +14,6 @@ try:
 except ImportError:
     WHISPER_AVAILABLE = False
 
-from src.config import config
 import os
 
 logger = logging.getLogger(__name__)

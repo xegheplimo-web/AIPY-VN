@@ -5,11 +5,10 @@ Endpoints for managing and triggering background tasks.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from src.celery_app import celery_app
-from src.tasks.email import send_welcome_email, send_order_confirmation
-from src.tasks.notifications import send_order_notification
+from src.tasks.email import send_welcome_email
 from src.tasks.orders import process_order
 
 logger = logging.getLogger(__name__)

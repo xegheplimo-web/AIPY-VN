@@ -6,7 +6,7 @@ Imports POI data from OpenStreetMap for Vietnam using Overpass API.
 
 import asyncio
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict
 import httpx
 
 from sqlalchemy.ext.asyncio import AsyncSession

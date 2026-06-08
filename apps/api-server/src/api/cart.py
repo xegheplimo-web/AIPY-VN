@@ -3,8 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select, delete, update
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select, update
 
 from src.database import async_session
 from src.models.store import Product

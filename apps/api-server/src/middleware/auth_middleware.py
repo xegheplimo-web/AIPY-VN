@@ -10,12 +10,11 @@ Provides:
 
 from typing import Optional, Callable
 from fastapi import Request, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-import os
 
-from src.services.ecc import get_jwt_service, get_ecc_service
+from src.services.ecc import get_jwt_service
 
 
 security = HTTPBearer(auto_error=False)

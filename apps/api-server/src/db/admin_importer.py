@@ -5,9 +5,8 @@ Imports Vietnam administrative data (63 provinces, 713 districts, 11,162 wards)
 from provinces.open-api.vn API.
 """
 
-import asyncio
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional
 import httpx
 
 from sqlalchemy.ext.asyncio import AsyncSession

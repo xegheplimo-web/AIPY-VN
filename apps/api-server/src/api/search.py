@@ -1,14 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
-import math
 import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from src.database import async_session
-from src.models.store import Store, Product
+from src.models.store import Product
 from src.services.geo import haversine_distance
 
 router = APIRouter(prefix="/api", tags=["Search"])

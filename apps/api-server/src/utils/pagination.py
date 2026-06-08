@@ -4,7 +4,7 @@ Pagination utility for SQLAlchemy queries.
 Provides consistent pagination across all API endpoints.
 """
 
-from typing import TypeVar, Generic
+from typing import TypeVar
 from sqlalchemy import Select
 
 T = TypeVar('T')

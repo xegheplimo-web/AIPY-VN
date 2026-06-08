@@ -11,7 +11,6 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, asdict
 import requests
 
-from src.config import config
 
 logger = logging.getLogger(__name__)
 

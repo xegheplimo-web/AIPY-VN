@@ -4,7 +4,7 @@ VietStore Shopping AI Agent
 Simple AI agent for helping users find products and stores using Ollama Cloud.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from src.services.llm import get_ollama_service
 from src.config import config
 import logging

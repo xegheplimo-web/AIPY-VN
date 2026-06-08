@@ -8,13 +8,13 @@ import logging
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from src.database import async_session
 from src.models.user import User
 from src.models.store import Store, Product
-from src.middleware.auth_middleware import get_current_user, require_auth
+from src.middleware.auth_middleware import require_auth
 from src.models.review import Review
 
 logger = logging.getLogger(__name__)

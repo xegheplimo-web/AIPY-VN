@@ -1,12 +1,11 @@
-import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import select, func
 
 from src.database import async_session
-from src.models.store import Store, Product, Category
+from src.models.store import Store, Product
 from src.models.user import User
 from src.models.order import Order
 

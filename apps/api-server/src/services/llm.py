@@ -5,7 +5,7 @@ Provides interface to Ollama cloud API for LLM inference.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
 try:
     import httpx
