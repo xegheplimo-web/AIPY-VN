@@ -1,25 +1,24 @@
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  DollarSign,
-  Calendar,
-  ArrowUpRight,
+import {
   ArrowDownRight,
+  ArrowUpRight,
   BarChart3,
-  PieChart
+  Calendar,
+  DollarSign,
+  Package,
+  PieChart,
+  ShoppingCart,
+  Users,
 } from 'lucide-react';
 import { useState } from 'react';
 
 export default function OwnerAnalyticsPage() {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
 
-  // Mock data - sẽ thay bằng API call sau
+  // Mock data for analytics visualization
+  // TODO: Integrate with real analytics API when available
   const stats = {
     revenue: {
-      value: 45.250000,
+      value: 45.25,
       change: 12.5,
       trend: 'up' as const,
     },
@@ -158,11 +157,11 @@ export default function OwnerAnalyticsPage() {
           </div>
           <div className="h-64 flex items-end gap-2">
             {hourlyData.map((data, idx) => {
-              const maxValue = Math.max(...hourlyData.map(d => d.revenue));
+              const maxValue = Math.max(...hourlyData.map((d) => d.revenue));
               const height = (data.revenue / maxValue) * 100;
               return (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-2">
-                  <div 
+                  <div
                     className="w-full bg-blue-500 rounded-t transition-all hover:bg-blue-600"
                     style={{ height: `${height}%` }}
                   />
@@ -182,21 +181,18 @@ export default function OwnerAnalyticsPage() {
           <div className="space-y-3">
             {categoryData.map((item) => (
               <div key={item.name} className="flex items-center gap-3">
-                <div 
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }} />
                 <div className="flex-1">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-700">{item.name}</span>
                     <span className="font-medium">{item.value}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                    <div 
+                    <div
                       className="h-2 rounded-full transition-all"
-                      style={{ 
+                      style={{
                         backgroundColor: item.color,
-                        width: `${item.value}%`
+                        width: `${item.value}%`,
                       }}
                     />
                   </div>
@@ -237,14 +233,20 @@ export default function OwnerAnalyticsPage() {
                     {formatMoney(product.revenue)}
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <span className={product.stock < 20 ? 'text-red-600 font-medium' : 'text-gray-700'}>
+                    <span
+                      className={product.stock < 20 ? 'text-red-600 font-medium' : 'text-gray-700'}
+                    >
                       {product.stock}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full ${
+                        product.stock > 0
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}
+                    >
                       {product.stock > 0 ? 'Còn hàng' : 'Hết hàng'}
                     </span>
                   </td>
@@ -265,14 +267,21 @@ export default function OwnerAnalyticsPage() {
                 <p className="font-medium text-gray-900">{item.query}</p>
                 <p className="text-sm text-gray-500">{item.count} lượt tìm</p>
               </div>
-              <div className={`flex items-center gap-1 text-sm ${
-                item.trend === 'up' ? 'text-green-600' : 
-                item.trend === 'down' ? 'text-red-600' : 
-                'text-gray-500'
-              }`}>
+              <div
+                className={`flex items-center gap-1 text-sm ${
+                  item.trend === 'up'
+                    ? 'text-green-600'
+                    : item.trend === 'down'
+                      ? 'text-red-600'
+                      : 'text-gray-500'
+                }`}
+              >
                 {item.trend === 'up' && <ArrowUpRight size={16} />}
                 {item.trend === 'down' && <ArrowDownRight size={16} />}
-                <span>{item.trend === 'up' ? '+' : item.trend === 'down' ? '-' : ''}{Math.abs(Math.random() * 20).toFixed(1)}%</span>
+                <span>
+                  {item.trend === 'up' ? '+' : item.trend === 'down' ? '-' : ''}
+                  {Math.abs(Math.random() * 20).toFixed(1)}%
+                </span>
               </div>
             </div>
           ))}
@@ -310,8 +319,11 @@ function StatCard({ title, value, change, trend, icon: Icon, color, bg }: StatCa
         ) : (
           <ArrowDownRight size={16} className="text-red-600" />
         )}
-        <span className={`text-sm font-medium ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-          {change > 0 ? '+' : ''}{change}%
+        <span
+          className={`text-sm font-medium ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}
+        >
+          {change > 0 ? '+' : ''}
+          {change}%
         </span>
         <span className="text-sm text-gray-500">so với kỳ trước</span>
       </div>

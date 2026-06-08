@@ -1,7 +1,9 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import { Check, Truck, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { DataTable } from '../components/ui/DataTable';
+import api from '../services/api';
 
 interface Order {
   id: string;
@@ -25,16 +27,54 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function OwnerOrdersPage() {
   const [activeTab, setActiveTab] = useState('all');
-  const [orders, setOrders] = useState<Order[]>([
-    { id: '1', order_number: 'ORD-2024-00001', customer: 'Nguyen Van A', total: '350,000', status: 'pending', date: '2024-12-01', items: ['Panadol Extra 500mg x2'] },
-    { id: '2', order_number: 'ORD-2024-00002', customer: 'Tran Thi B', total: '125,000', status: 'confirmed', date: '2024-12-01', items: ['Vitamin C 1000mg x1'] },
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = activeTab === 'all' ? orders : orders.filter(o => o.status === activeTab);
+  useEffect(() => {
+    loadOrders();
+  }, [activeTab]);
 
-  const updateStatus = (id: string, newStatus: string) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const params: any = { limit: 100 };
+      if (activeTab !== 'all') {
+        params.status = activeTab;
+      }
+      const response = await api.getOrders(params);
+
+      // Transform API response to match interface
+      const transformed = response.orders.map((order: any) => ({
+        id: order.id,
+        order_number: order.order_number || `ORD-${order.id}`,
+        customer: order.customer_name || order.customer || 'Unknown',
+        total: order.total?.toLocaleString('vi-VN') || '0',
+        status: order.status || 'pending',
+        date: new Date(order.created_at || Date.now()).toLocaleDateString('vi-VN'),
+        items: order.items?.map((item: any) => item.name || item.product_name) || [],
+      }));
+
+      setOrders(transformed);
+    } catch (err) {
+      console.error('Failed to load orders:', err);
+      toast.error('Không thể tải danh sách đơn hàng');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const updateStatus = async (id: string, newStatus: string) => {
+    try {
+      await api.updateOrderStatus(id, newStatus);
+      toast.success('Đã cập nhật trạng thái đơn hàng');
+      await loadOrders();
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+      toast.error('Cập nhật trạng thái thất bại');
+    }
+  };
+
+  const filtered = activeTab === 'all' ? orders : orders.filter((o) => o.status === activeTab);
 
   const columns: ColumnDef<Order>[] = [
     {
@@ -62,20 +102,24 @@ export default function OwnerOrdersPage() {
     {
       accessorKey: 'total',
       header: 'Tong tien',
-      cell: ({ row }) => (
-        <div className="font-bold text-blue-600">{row.getValue('total')}đ</div>
-      ),
+      cell: ({ row }) => <div className="font-bold text-blue-600">{row.getValue('total')}đ</div>,
     },
     {
       accessorKey: 'status',
       header: 'Trang thai',
       cell: ({ row }) => (
-        <span className={`text-xs px-2 py-1 rounded-full ${
-          row.getValue('status') === 'completed' ? 'bg-green-100 text-green-700' :
-          row.getValue('status') === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-          'bg-blue-100 text-blue-700'
-        }`}>
-          {STATUS_LABELS[row.getValue('status')]}
+        <span
+          className={`text-xs px-2 py-1 rounded-full ${
+            row.getValue('status') === 'completed'
+              ? 'bg-green-100 text-green-700'
+              : row.getValue('status') === 'pending'
+                ? 'bg-yellow-100 text-yellow-700'
+                : row.getValue('status') === 'cancelled'
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-blue-100 text-blue-700'
+          }`}
+        >
+          {STATUS_LABELS[row.getValue('status')] || row.getValue('status')}
         </span>
       ),
     },
@@ -88,14 +132,14 @@ export default function OwnerOrdersPage() {
           <div className="flex gap-2">
             {status === 'pending' && (
               <>
-                <button 
-                  onClick={() => updateStatus(row.original.id, 'confirmed')} 
+                <button
+                  onClick={() => updateStatus(row.original.id, 'confirmed')}
                   className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg flex items-center gap-1"
                 >
                   <Check className="w-4 h-4" /> Chap nhan
                 </button>
-                <button 
-                  onClick={() => updateStatus(row.original.id, 'cancelled')} 
+                <button
+                  onClick={() => updateStatus(row.original.id, 'cancelled')}
                   className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg flex items-center gap-1"
                 >
                   <X className="w-4 h-4" /> Tu choi
@@ -103,16 +147,16 @@ export default function OwnerOrdersPage() {
               </>
             )}
             {status === 'confirmed' && (
-              <button 
-                onClick={() => updateStatus(row.original.id, 'preparing')} 
+              <button
+                onClick={() => updateStatus(row.original.id, 'preparing')}
                 className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg flex items-center gap-1"
               >
                 <Truck className="w-4 h-4" /> Bat dau chuan bi
               </button>
             )}
             {status === 'preparing' && (
-              <button 
-                onClick={() => updateStatus(row.original.id, 'ready')} 
+              <button
+                onClick={() => updateStatus(row.original.id, 'ready')}
                 className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg"
               >
                 San sang giao
@@ -123,6 +167,14 @@ export default function OwnerOrdersPage() {
       },
     },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-4 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4">
@@ -143,7 +195,19 @@ export default function OwnerOrdersPage() {
           ))}
         </div>
 
-        <DataTable columns={columns} data={filtered} searchKey="order_number" />
+        {filtered.length === 0 ? (
+          <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
+            <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Không có đơn hàng</h3>
+            <p className="text-gray-500">
+              {activeTab === 'all'
+                ? 'Chưa có đơn hàng nào'
+                : `Không có đơn hàng ${STATUS_LABELS[activeTab]}`}
+            </p>
+          </div>
+        ) : (
+          <DataTable columns={columns} data={filtered} searchKey="order_number" />
+        )}
       </div>
     </div>
   );

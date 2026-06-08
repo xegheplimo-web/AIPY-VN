@@ -9,6 +9,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import api from '../services/api';
 
 interface StoreVerification {
   id: string;
@@ -34,58 +36,37 @@ export default function StoreVerificationPage() {
 
   useEffect(() => {
     loadVerifications();
-  }, []);
+  }, [filter]);
 
   const loadVerifications = async () => {
     try {
-      // Mock data - sẽ thay bằng API call sau
-      const mockData: StoreVerification[] = [
-        {
-          id: '1',
-          name: 'Nhà thuốc An Khang',
-          address: '123 Nguyễn Trãi, Quận 1, TP.HCM',
-          phone: '0901234567',
-          email: 'anhkang@example.com',
-          businessLicense: 'GP-12345',
-          taxId: '123456789',
-          submittedAt: new Date(Date.now() - 2 * 3600000),
-          status: 'pending',
-          documents: ['license.jpg', 'id_card.jpg'],
-          ownerName: 'Nguyễn Văn A',
-          ownerPhone: '0901234567',
-        },
-        {
-          id: '2',
-          name: 'Nhà thuốc Long Châu',
-          address: '456 Lê Lợi, Quận 3, TP.HCM',
-          phone: '0912345678',
-          email: 'longchau@example.com',
-          businessLicense: 'GP-67890',
-          taxId: '987654321',
-          submittedAt: new Date(Date.now() - 24 * 3600000),
-          status: 'pending',
-          documents: ['license.jpg'],
-          ownerName: 'Trần Thị B',
-          ownerPhone: '0912345678',
-        },
-        {
-          id: '3',
-          name: 'Nhà thuốc Pharmacity',
-          address: '789 Hai Bà Trưng, Quận 5, TP.HCM',
-          phone: '0923456789',
-          email: 'pharmacity@example.com',
-          businessLicense: 'GP-11111',
-          taxId: '111222333',
-          submittedAt: new Date(Date.now() - 48 * 3600000),
-          status: 'approved',
-          documents: ['license.jpg', 'id_card.jpg', 'tax_paper.jpg'],
-          ownerName: 'Lê Văn C',
-          ownerPhone: '0923456789',
-        },
-      ];
-      setVerifications(mockData);
+      setLoading(true);
+      const params: any = { limit: 100 };
+      if (filter !== 'all') {
+        params.status = filter;
+      }
+      const response = await api.getStores(params);
+
+      // Transform API response to match interface
+      const transformed = response.stores.map((store: any) => ({
+        id: store.id,
+        name: store.name,
+        address: store.address,
+        phone: store.phone || '',
+        email: store.email || '',
+        businessLicense: store.business_license || '',
+        taxId: store.tax_id || '',
+        submittedAt: new Date(store.created_at || Date.now()),
+        status: store.verification_status || 'pending',
+        documents: store.documents || [],
+        ownerName: store.owner_name || '',
+        ownerPhone: store.owner_phone || '',
+      }));
+
+      setVerifications(transformed);
     } catch (err) {
       console.error('Failed to load verifications:', err);
+      toast.error('Không thể tải danh sách cửa hàng');
     } finally {
       setLoading(false);
     }
@@ -93,12 +74,12 @@ export default function StoreVerificationPage() {
 
   const handleApprove = async (id: string) => {
     try {
-      // Mock API call
-      setVerifications((prev) =>
-        prev.map((v) => (v.id === id ? { ...v, status: 'approved' as const } : v))
-      );
+      await api.verifyStore(id, true);
+      toast.success('Đã phê duyệt cửa hàng');
+      await loadVerifications();
     } catch (err) {
-      alert('Phê duyệt thất bại');
+      console.error('Failed to approve store:', err);
+      toast.error('Phê duyệt thất bại');
     }
   };
 
@@ -107,12 +88,12 @@ export default function StoreVerificationPage() {
     if (!reason) return;
 
     try {
-      // Mock API call
-      setVerifications((prev) =>
-        prev.map((v) => (v.id === id ? { ...v, status: 'rejected' as const } : v))
-      );
+      await api.verifyStore(id, false);
+      toast.success('Đã từ chối cửa hàng');
+      await loadVerifications();
     } catch (err) {
-      alert('Từ chối thất bại');
+      console.error('Failed to reject store:', err);
+      toast.error('Từ chối thất bại');
     }
   };
 
@@ -242,196 +223,201 @@ export default function StoreVerificationPage() {
         </div>
       </div>
 
+      {/* Empty State */}
+      {filteredVerifications.length === 0 && (
+        <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
+          <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Không có cửa hàng nào</h3>
+          <p className="text-gray-500">
+            {searchQuery
+              ? 'Không tìm thấy cửa hàng phù hợp'
+              : filter === 'all'
+                ? 'Chưa có cửa hàng nào đăng ký'
+                : `Không có cửa hàng ${filter === 'pending' ? 'chờ duyệt' : filter === 'approved' ? 'đã duyệt' : 'đã từ chối'}`}
+          </p>
+        </div>
+      )}
+
       {/* Verification List */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-gray-50">
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Cửa hàng</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Chủ sở hữu</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Giấy phép</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Ngày đăng</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Trạng thái</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredVerifications.length === 0 ? (
+      {filteredVerifications.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b">
               <tr>
-                <td colSpan={7} className="text-center py-12 text-gray-500">
-                  Không tìm thấy kết quả
-                </td>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Cửa hàng
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Địa chỉ
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Giấy phép
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Ngày đăng ký
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Trạng thái
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Hành động
+                </th>
               </tr>
-            ) : (
-              filteredVerifications.map((verification) => (
-                <tr key={verification.id} className="border-b hover:bg-gray-50">
-                  <td className="py-4 px-4">
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredVerifications.map((v) => (
+                <tr key={v.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
                     <div>
-                      <p className="font-medium text-gray-900">{verification.name}</p>
-                      <p className="text-sm text-gray-500 flex items-center gap-1">
-                        <MapPin size={14} /> {verification.address}
-                      </p>
+                      <p className="font-medium text-gray-900">{v.name}</p>
+                      <p className="text-sm text-gray-500">{v.ownerName}</p>
+                      <p className="text-sm text-gray-500">{v.phone}</p>
                     </div>
                   </td>
-                  <td className="py-4 px-4">
-                    <div>
-                      <p className="font-medium text-gray-900">{verification.ownerName}</p>
-                      <p className="text-sm text-gray-500">{verification.ownerPhone}</p>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <MapPin className="w-4 h-4" />
+                      {v.address}
                     </div>
                   </td>
-                  <td className="py-4 px-4">
-                    <div className="space-y-1 text-sm">
-                      <p>
-                        <span className="text-gray-500">GP:</span> {verification.businessLicense}
-                      </p>
-                      <p>
-                        <span className="text-gray-500">MST:</span> {verification.taxId}
-                      </p>
+                  <td className="px-6 py-4">
+                    <div className="text-sm">
+                      <p className="text-gray-900">{v.businessLicense}</p>
+                      <p className="text-gray-500">MST: {v.taxId}</p>
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-sm text-gray-600">
-                    {verification.submittedAt.toLocaleDateString('vi-VN')}
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {v.submittedAt.toLocaleDateString('vi-VN')}
                   </td>
-                  <td className="py-4 px-4">{getStatusBadge(verification.status)}</td>
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex gap-2 justify-end">
+                  <td className="px-6 py-4">{getStatusBadge(v.status)}</td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => setSelectedStore(verification)}
-                        className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+                        onClick={() => setSelectedStore(v)}
+                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                         title="Xem chi tiết"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      {verification.status === 'pending' && (
+                      {v.status === 'pending' && (
                         <>
                           <button
-                            onClick={() => handleApprove(verification.id)}
-                            className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200"
-                            title="Phê duyệt"
+                            onClick={() => handleApprove(v.id)}
+                            className="px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition"
                           >
-                            <CheckCircle className="w-4 h-4" />
+                            Duyệt
                           </button>
                           <button
-                            onClick={() => handleReject(verification.id)}
-                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
-                            title="Từ chối"
+                            onClick={() => handleReject(v.id)}
+                            className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition"
                           >
-                            <XCircle className="w-4 h-4" />
+                            Từ chối
                           </button>
                         </>
                       )}
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Detail Modal */}
       {selectedStore && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-bold">Chi tiết đăng ký</h2>
-              <button
-                onClick={() => setSelectedStore(null)}
-                className="p-2 hover:bg-gray-100 rounded"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-96 space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2">Thông tin cửa hàng</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Tên:</span>
-                    <span className="font-medium">{selectedStore.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Địa chỉ:</span>
-                    <span className="font-medium">{selectedStore.address}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Điện thoại:</span>
-                    <span className="font-medium">{selectedStore.phone}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Email:</span>
-                    <span className="font-medium">{selectedStore.email}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Thông tin chủ sở hữu</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Tên:</span>
-                    <span className="font-medium">{selectedStore.ownerName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Điện thoại:</span>
-                    <span className="font-medium">{selectedStore.ownerPhone}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Giấy phép kinh doanh</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">GP:</span>
-                    <span className="font-medium">{selectedStore.businessLicense}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">MST:</span>
-                    <span className="font-medium">{selectedStore.taxId}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Tài liệu đính kèm</h3>
-                <div className="space-y-2">
-                  {selectedStore.documents.map((doc, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                      <FileSpreadsheet className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm">{doc}</span>
-                    </div>
-                  ))}
-                </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Chi tiết cửa hàng</h2>
+                <button
+                  onClick={() => setSelectedStore(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                >
+                  <XCircle className="w-5 h-5 text-gray-500" />
+                </button>
               </div>
             </div>
-            <div className="p-6 border-t flex gap-3 justify-end">
-              <button
-                onClick={() => setSelectedStore(null)}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-              >
-                Đóng
-              </button>
-              {selectedStore.status === 'pending' && (
-                <>
-                  <button
-                    onClick={() => {
-                      handleReject(selectedStore.id);
-                      setSelectedStore(null);
-                    }}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                  >
-                    Từ chối
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleApprove(selectedStore.id);
-                      setSelectedStore(null);
-                    }}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    Phê duyệt
-                  </button>
-                </>
-              )}
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Tên cửa hàng</p>
+                <p className="font-medium text-gray-900">{selectedStore.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Địa chỉ</p>
+                <p className="text-gray-900">{selectedStore.address}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Số điện thoại</p>
+                  <p className="text-gray-900">{selectedStore.phone}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Email</p>
+                  <p className="text-gray-900">{selectedStore.email}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Giấy phép kinh doanh</p>
+                  <p className="text-gray-900">{selectedStore.businessLicense}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Mã số thuế</p>
+                  <p className="text-gray-900">{selectedStore.taxId}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Chủ sở hữu</p>
+                <p className="text-gray-900">{selectedStore.ownerName}</p>
+                <p className="text-gray-900">{selectedStore.ownerPhone}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Tài liệu đính kèm</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedStore.documents.length > 0 ? (
+                    selectedStore.documents.map((doc, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-lg text-sm"
+                      >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        {doc}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-gray-500">Không có tài liệu</p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Trạng thái</p>
+                {getStatusBadge(selectedStore.status)}
+              </div>
             </div>
+            {selectedStore.status === 'pending' && (
+              <div className="p-6 border-t flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    handleReject(selectedStore.id);
+                    setSelectedStore(null);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition"
+                >
+                  Từ chối
+                </button>
+                <button
+                  onClick={() => {
+                    handleApprove(selectedStore.id);
+                    setSelectedStore(null);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition"
+                >
+                  Duyệt
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
