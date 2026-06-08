@@ -1,14 +1,40 @@
 import {
   AlertTriangle,
-  Building2,
+  ArrowLeftRight,
   CheckCircle,
+  Clock,
+  Database,
+  Loader2,
   MapPin,
   Merge,
-  Percent,
+  Phone,
+  RefreshCw,
   Search,
+  Store,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import api from '../services/api';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from '../components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { Skeleton } from '../components/ui/skeleton';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface SeedStore {
   id: string;
@@ -18,7 +44,7 @@ interface SeedStore {
   latitude: number;
   longitude: number;
   industry: string;
-  source: 'openstreetmap' | 'manual';
+  source: string;
 }
 
 interface RegisteredStore {
@@ -31,433 +57,609 @@ interface RegisteredStore {
   longitude: number;
   industry: string;
   ownerName: string;
-  submittedAt: Date;
+  submittedAt: string;
 }
 
-interface Match {
+interface MatchItem {
+  id: string;
   seed: SeedStore;
   registered: RegisteredStore;
   similarity: number;
   status: 'pending' | 'approved' | 'rejected' | 'merged';
+  matchedAt: string;
 }
 
+type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
+type ConfirmAction = { matchId: string; action: 'approve' | 'reject' } | null;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function safeString(val: unknown, fallback = ''): string {
+  return typeof val === 'string' ? val : fallback;
+}
+
+function safeNumber(val: unknown, fallback = 0): number {
+  return typeof val === 'number' && !isNaN(val) ? val : fallback;
+}
+
+function parseSeed(raw: Record<string, unknown>): SeedStore {
+  return {
+    id: safeString(raw.id),
+    name: safeString(raw.name),
+    address: safeString(raw.address),
+    phone: safeString(raw.phone),
+    latitude: safeNumber(raw.latitude),
+    longitude: safeNumber(raw.longitude),
+    industry: safeString(raw.industry),
+    source: safeString(raw.source),
+  };
+}
+
+function parseRegistered(raw: Record<string, unknown>): RegisteredStore {
+  return {
+    id: safeString(raw.id),
+    name: safeString(raw.name),
+    address: safeString(raw.address),
+    phone: safeString(raw.phone),
+    email: safeString(raw.email),
+    latitude: safeNumber(raw.latitude),
+    longitude: safeNumber(raw.longitude),
+    industry: safeString(raw.industry),
+    ownerName: safeString(raw.owner_name ?? raw.ownerName),
+    submittedAt: safeString(raw.submitted_at ?? raw.submittedAt),
+  };
+}
+
+function parseMatch(raw: Record<string, unknown>): MatchItem {
+  const seedRaw = (raw.seed ?? raw.seed_store ?? {}) as Record<string, unknown>;
+  const regRaw = (raw.registered ?? raw.registered_store ?? raw.store ?? {}) as Record<string, unknown>;
+  const statusVal = safeString(raw.status, 'pending').toLowerCase();
+  const validStatuses = ['pending', 'approved', 'rejected', 'merged'] as const;
+
+  return {
+    id: safeString(raw.id),
+    seed: parseSeed(seedRaw),
+    registered: parseRegistered(regRaw),
+    similarity: safeNumber(raw.similarity ?? raw.confidence ?? raw.score),
+    status: validStatuses.includes(statusVal as (typeof validStatuses)[number])
+      ? (statusVal as (typeof validStatuses)[number])
+      : 'pending',
+    matchedAt: safeString(raw.matched_at ?? raw.created_at ?? raw.matchedAt ?? raw.createdAt),
+  };
+}
+
+function formatDate(iso: string): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function similarityColor(similarity: number) {
+  if (similarity >= 90) return { bg: 'bg-emerald-100 text-emerald-700', ring: 'ring-emerald-300' };
+  if (similarity >= 80) return { bg: 'bg-amber-100 text-amber-700', ring: 'ring-amber-300' };
+  return { bg: 'bg-red-100 text-red-700', ring: 'ring-red-300' };
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function MatchQueuePage() {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'high' | 'medium' | 'low'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [matches, setMatches] = useState<MatchItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [processing, setProcessing] = useState<string | null>(null); // matchId being processed
 
-  useEffect(() => {
-    loadMatches();
-  }, []);
+  // ── Data loading ─────────────────────────────────────────────────────────
 
-  const loadMatches = async () => {
+  const loadMatches = useCallback(async () => {
     try {
-      // Mock data - sẽ thay bằng API call sau
-      const mockMatches: Match[] = [
-        {
-          seed: {
-            id: 'seed-1',
-            name: 'Nhà thuốc An Khang',
-            address: '123 Nguyễn Trãi, Quận 1, TP.HCM',
-            phone: '0901234567',
-            latitude: 10.7726,
-            longitude: 106.698,
-            industry: 'Dược phẩm',
-            source: 'openstreetmap',
-          },
-          registered: {
-            id: 'reg-1',
-            name: 'Nhà thuốc An Khang Q1',
-            address: '123 Nguyễn Trãi, Quận 1, TP.HCM',
-            phone: '0901234567',
-            email: 'anhkang@example.com',
-            latitude: 10.7726,
-            longitude: 106.698,
-            industry: 'Dược phẩm',
-            ownerName: 'Nguyễn Văn A',
-            submittedAt: new Date(),
-          },
-          similarity: 96,
-          status: 'pending',
-        },
-        {
-          seed: {
-            id: 'seed-2',
-            name: 'Nhà thuốc Long Châu',
-            address: '456 Lê Lợi, Quận 3, TP.HCM',
-            phone: '0912345678',
-            latitude: 10.785,
-            longitude: 106.695,
-            industry: 'Dược phẩm',
-            source: 'openstreetmap',
-          },
-          registered: {
-            id: 'reg-2',
-            name: 'Nhà thuốc Long Châu Lê Lợi',
-            address: '456 Lê Lợi, Quận 3, TP.HCM',
-            phone: '0912345678',
-            email: 'longchau@example.com',
-            latitude: 10.785,
-            longitude: 106.695,
-            industry: 'Dược phẩm',
-            ownerName: 'Trần Thị B',
-            submittedAt: new Date(),
-          },
-          similarity: 92,
-          status: 'pending',
-        },
-        {
-          seed: {
-            id: 'seed-3',
-            name: 'Nhà thuốc Pharmacity',
-            address: '789 Hai Bà Trưng, Quận 5, TP.HCM',
-            phone: '0923456789',
-            latitude: 10.775,
-            longitude: 106.71,
-            industry: 'Dược phẩm',
-            source: 'manual',
-          },
-          registered: {
-            id: 'reg-3',
-            name: 'Pharmacity Q5',
-            address: '789 Hai Bà Trưng, Quận 5, TP.HCM',
-            phone: '0923456789',
-            email: 'pharmacity@example.com',
-            latitude: 10.775,
-            longitude: 106.71,
-            industry: 'Dược phẩm',
-            ownerName: 'Lê Văn C',
-            submittedAt: new Date(),
-          },
-          similarity: 88,
-          status: 'pending',
-        },
-        {
-          seed: {
-            id: 'seed-4',
-            name: 'Nhà thuốc Pharmacity',
-            address: '123 Võ Văn Tần, Quận 6',
-            phone: '0934567890',
-            latitude: 10.78,
-            longitude: 106.72,
-            industry: 'Dược phẩm',
-            source: 'openstreetmap',
-          },
-          registered: {
-            id: 'reg-4',
-            name: 'Nhà thuốc mới',
-            address: '456 Võ Văn Tần, Quận 6',
-            phone: '0934567890',
-            email: 'new@example.com',
-            latitude: 10.78,
-            longitude: 106.72,
-            industry: 'Dược phẩm',
-            ownerName: 'Nguyễn Văn D',
-            submittedAt: new Date(),
-          },
-          similarity: 75,
-          status: 'pending',
-        },
-      ];
-      setMatches(mockMatches);
-    } catch (err) {
-      console.error('Failed to load matches:', err);
+      setLoading(true);
+      setError(null);
+      const response = await api.getMatchQueue({ limit: 200 });
+
+      // Safely extract matches array from various possible response shapes
+      const rawList = Array.isArray(response)
+        ? response
+        : Array.isArray((response as Record<string, unknown>)?.matches)
+          ? (response as Record<string, unknown>).matches
+          : Array.isArray((response as Record<string, unknown>)?.data)
+            ? (response as Record<string, unknown>).data
+            : [];
+
+      const parsed = rawList.map((item: unknown) =>
+        parseMatch(item as Record<string, unknown>)
+      );
+
+      setMatches(parsed);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể tải danh sách ghép nối';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleApprove = async (matchId: string) => {
+  useEffect(() => {
+    loadMatches();
+  }, [loadMatches]);
+
+  // ── Action handlers ──────────────────────────────────────────────────────
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return;
+    const { matchId, action } = confirmAction;
+
     try {
+      setProcessing(matchId);
+      await api.processMatch(matchId, action);
+
+      // Optimistically update status
       setMatches((prev) =>
         prev.map((m) =>
-          `${m.seed.id}-${m.registered.id}` === matchId ? { ...m, status: 'approved' as const } : m
+          m.id === matchId ? { ...m, status: action === 'approve' ? 'approved' : 'rejected' } : m
         )
       );
-    } catch (err) {
-      alert('Phê duyệt thất bại');
+
+      toast.success(action === 'approve' ? 'Đã phê duyệt ghép nối' : 'Đã từ chối ghép nối');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Thao tác thất bại';
+      toast.error(message);
+      // Refresh from server on failure
+      await loadMatches();
+    } finally {
+      setProcessing(null);
+      setConfirmAction(null);
     }
   };
 
-  const handleMerge = async (matchId: string) => {
-    try {
-      setMatches((prev) =>
-        prev.map((m) =>
-          `${m.seed.id}-${m.registered.id}` === matchId ? { ...m, status: 'merged' as const } : m
-        )
-      );
-    } catch (err) {
-      alert('Gộp thất bại');
-    }
-  };
-
-  const handleReject = async (matchId: string) => {
-    try {
-      setMatches((prev) =>
-        prev.map((m) =>
-          `${m.seed.id}-${m.registered.id}` === matchId ? { ...m, status: 'rejected' as const } : m
-        )
-      );
-    } catch (err) {
-      alert('Từ chối thất bại');
-    }
-  };
+  // ── Derived data ─────────────────────────────────────────────────────────
 
   const filteredMatches = matches.filter((m) => {
-    const matchesFilter = filter === 'all' || m.status === filter;
+    const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      searchQuery === '' ||
-      m.seed.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.registered.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSimilarity =
-      filter === 'high'
-        ? m.similarity >= 90
-        : filter === 'medium'
-          ? m.similarity >= 80 && m.similarity < 90
-          : filter === 'low'
-            ? m.similarity < 80
-            : true;
-    return matchesFilter && matchesSearch && matchesSimilarity;
+      !q ||
+      m.seed.name.toLowerCase().includes(q) ||
+      m.seed.address.toLowerCase().includes(q) ||
+      m.registered.name.toLowerCase().includes(q) ||
+      m.registered.address.toLowerCase().includes(q) ||
+      m.registered.ownerName.toLowerCase().includes(q);
+    return matchesStatus && matchesSearch;
   });
 
-  const getSimilarityBadge = (similarity: number) => {
-    if (similarity >= 90) {
-      return { label: `${similarity}%`, color: 'bg-green-100 text-green-700' };
-    } else if (similarity >= 80) {
-      return { label: `${similarity}%`, color: 'bg-yellow-100 text-yellow-700' };
-    } else {
-      return { label: `${similarity}%`, color: 'bg-red-100 text-red-700' };
-    }
+  const stats = {
+    total: matches.length,
+    pending: matches.filter((m) => m.status === 'pending').length,
+    approved: matches.filter((m) => m.status === 'approved').length,
+    rejected: matches.filter((m) => m.status === 'rejected').length,
   };
 
-  const getStatusBadge = (status: string) => {
-    const config = {
-      pending: { label: 'Chờ xử lý', color: 'bg-yellow-100 text-yellow-700' },
-      approved: { label: 'Đã duyệt', color: 'bg-green-100 text-green-700' },
-      rejected: { label: 'Đã từ chối', color: 'bg-red-100 text-red-700' },
-      merged: { label: 'Đã gộp', color: 'bg-blue-100 text-blue-700' },
+  // ── Status badge ─────────────────────────────────────────────────────────
+
+  const renderStatusBadge = (status: MatchItem['status']) => {
+    const cfg: Record<MatchItem['status'], { label: string; cls: string }> = {
+      pending: { label: 'Chờ xử lý', cls: 'bg-amber-100 text-amber-700' },
+      approved: { label: 'Đã duyệt', cls: 'bg-emerald-100 text-emerald-700' },
+      rejected: { label: 'Đã từ chối', cls: 'bg-red-100 text-red-700' },
+      merged: { label: 'Đã gộp', cls: 'bg-sky-100 text-sky-700' },
     };
-    const { label, color } = config[status as keyof typeof config];
-    return <span className={`px-3 py-1 rounded-full text-xs font-medium ${color}`}>{label}</span>;
+    const { label, cls } = cfg[status];
+    return <Badge className={`${cls} border-0 font-medium`}>{label}</Badge>;
   };
 
-  if (loading) {
+  // ── Render: Loading skeleton ─────────────────────────────────────────────
+
+  if (loading && matches.length === 0) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-56 rounded-xl" />
+        ))}
       </div>
     );
   }
+
+  // ── Render: Error state ──────────────────────────────────────────────────
+
+  if (error && matches.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <AlertTriangle className="w-16 h-16 text-red-400" />
+        <h2 className="text-xl font-semibold text-gray-900">Không thể tải dữ liệu</h2>
+        <p className="text-gray-500 max-w-md text-center">{error}</p>
+        <Button onClick={loadMatches} className="gap-2">
+          <RefreshCw className="w-4 h-4" />
+          Thử lại
+        </Button>
+      </div>
+    );
+  }
+
+  // ── Render: Main ─────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Match Queue</h1>
-          <p className="text-gray-500 mt-1">Ghép dữ liệu seed với cửa hàng đăng ký</p>
+          <h1 className="text-2xl font-bold text-gray-900">Hàng đợi ghép nối</h1>
+          <p className="text-gray-500 mt-1">
+            Ghép nối dữ liệu seed với cửa hàng đã đăng ký
+          </p>
         </div>
+        <Button
+          variant="outline"
+          onClick={loadMatches}
+          disabled={loading}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Làm mới
+        </Button>
       </div>
 
       {/* Info Banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-blue-900">Thông tin Match Queue</h3>
-            <p className="text-sm text-blue-800 mt-1">
-              Hệ thống tự động so sánh cửa hàng từ dữ liệu seed (OpenStreetMap, manual) với cửa hàng
-              đăng ký. Similarity ≥90%: Tự động gộp, 80-89%: Cần review, &lt;80%: Từ chối.
+            <h3 className="font-semibold text-amber-900">Hướng dẫn ghép nối</h3>
+            <p className="text-sm text-amber-800 mt-1">
+              Hệ thống tự động so khớp cửa hàng từ dữ liệu seed (OpenStreetMap, thủ công) với cửa hàng
+              đã đăng ký. Độ tương đồng ≥90%: Khuyến nghị duyệt, 80–89%: Cần xem xét, &lt;80%: Nên
+              từ chối.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border p-4">
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm cửa hàng..."
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex gap-2">
-            {['all', 'pending', 'high', 'medium', 'low'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilter(status as any)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  filter === status
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {status === 'all'
-                  ? 'Tất cả'
-                  : status === 'pending'
-                    ? 'Chờ xử lý'
-                    : status === 'high'
-                      ? '≥90%'
-                      : status === 'medium'
-                        ? '80-89%'
-                        : '&lt;80%'}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Stats Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Tổng ghép nối</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <Merge className="w-8 h-8 text-gray-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Chờ xử lý</p>
+                <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+              </div>
+              <Clock className="w-8 h-8 text-amber-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Đã duyệt</p>
+                <p className="text-2xl font-bold text-emerald-600">{stats.approved}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-emerald-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Đã từ chối</p>
+                <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+              </div>
+              <XCircle className="w-8 h-8 text-red-500" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Tổng số match</p>
-              <p className="text-2xl font-bold text-gray-900">{matches.length}</p>
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm kiếm theo tên, địa chỉ, chủ sở hữu..."
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
             </div>
-            <Merge className="w-8 h-8 text-gray-400" />
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Similarity cao (≥90%)</p>
-              <p className="text-2xl font-bold text-green-600">
-                {matches.filter((m) => m.similarity >= 90).length}
-              </p>
+            <div className="flex gap-2 flex-wrap">
+              {(
+                [
+                  ['all', 'Tất cả'],
+                  ['pending', 'Chờ xử lý'],
+                  ['approved', 'Đã duyệt'],
+                  ['rejected', 'Đã từ chối'],
+                ] as [StatusFilter, string][]
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => setStatusFilter(value)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    statusFilter === value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-            <Percent className="w-8 h-8 text-green-500" />
           </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Trung bình (80-89%)</p>
-              <p className="text-2xl font-bold text-yellow-600">
-                {matches.filter((m) => m.similarity >= 80 && m.similarity < 90).length}
-              </p>
-            </div>
-            <Percent className="w-8 h-8 text-yellow-500" />
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Thấp (&lt;80%)</p>
-              <p className="text-2xl font-bold text-red-600">
-                {matches.filter((m) => m.similarity < 80).length}
-              </p>
-            </div>
-            <Percent className="w-8 h-8 text-red-500" />
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Match List */}
       <div className="space-y-4">
         {filteredMatches.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-            <Merge className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">Không tìm thấy kết quả</p>
-          </div>
+          <Card>
+            <CardContent className="p-12 text-center">
+              <ArrowLeftRight className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Không tìm thấy kết quả</h3>
+              <p className="text-gray-500">
+                {searchQuery
+                  ? 'Không có ghép nối phù hợp với từ khóa tìm kiếm'
+                  : statusFilter !== 'all'
+                    ? `Không có ghép nối ở trạng thái "${statusFilter === 'pending' ? 'Chờ xử lý' : statusFilter === 'approved' ? 'Đã duyệt' : 'Đã từ chối'}"`
+                    : 'Chưa có ghép nối nào trong hàng đợi'}
+              </p>
+            </CardContent>
+          </Card>
         ) : (
-          filteredMatches.map((match) => (
-            <div
-              key={`${match.seed.id}-${match.registered.id}`}
-              className="bg-white rounded-xl shadow-sm border p-6"
-            >
-              <div className="flex items-start gap-6">
-                {/* Seed Store */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building2 className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs text-blue-600 font-medium">SEED DATA</span>
-                  </div>
-                  <h3 className="font-semibold text-gray-900">{match.seed.name}</h3>
-                  <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                    <MapPin size={14} /> {match.seed.address}
-                  </p>
-                  <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                    <span>📞 {match.seed.phone}</span>
-                    <span>🏭 {match.seed.industry}</span>
-                    <span>📍 {match.seed.source}</span>
-                  </div>
-                </div>
+          filteredMatches.map((match) => {
+            const sim = similarityColor(match.similarity);
+            const isProcessing = processing === match.id;
 
-                {/* Similarity */}
-                <div className="flex flex-col items-center justify-center px-4">
-                  <div
-                    className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg ${getSimilarityBadge(match.similarity).color}`}
-                  >
-                    {match.similarity}%
+            return (
+              <Card key={match.id} className="overflow-hidden">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {renderStatusBadge(match.status)}
+                      <span className="text-sm text-gray-500">
+                        Ngày ghép: {formatDate(match.matchedAt)}
+                      </span>
+                    </div>
+                    <div
+                      className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-sm ring-2 ${sim.bg} ${sim.ring}`}
+                    >
+                      {match.similarity}%
+                    </div>
                   </div>
-                  <span className="text-xs text-gray-500 mt-2">Similarity</span>
-                </div>
+                </CardHeader>
 
-                {/* Registered Store */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building2 className="w-4 h-4 text-green-600" />
-                    <span className="text-xs text-green-600 font-medium">ĐĂNG KÝ</span>
-                  </div>
-                  <h3 className="font-semibold text-gray-900">{match.registered.name}</h3>
-                  <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                    <MapPin size={14} /> {match.registered.address}
-                  </p>
-                  <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                    <span>📞 {match.registered.phone}</span>
-                    <span>👤 {match.registered.ownerName}</span>
-                    <span>🏭 {match.registered.industry}</span>
-                  </div>
-                </div>
-              </div>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+                    {/* Seed Store */}
+                    <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 space-y-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Database className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+                          Dữ liệu Seed
+                        </span>
+                      </div>
+                      <h4 className="font-semibold text-gray-900">{match.seed.name || '—'}</h4>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <p className="flex items-start gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          {match.seed.address || '—'}
+                        </p>
+                        {match.seed.phone && (
+                          <p className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                            {match.seed.phone}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {match.seed.industry && (
+                            <Badge variant="secondary" className="text-xs">
+                              {match.seed.industry}
+                            </Badge>
+                          )}
+                          {match.seed.source && (
+                            <Badge variant="outline" className="text-xs">
+                              {match.seed.source === 'openstreetmap' ? 'OSM' : match.seed.source}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-              {/* Actions */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                <div className="flex items-center gap-2">{getStatusBadge(match.status)}</div>
-                <div className="flex gap-2">
-                  {match.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => handleMerge(`${match.seed.id}-${match.registered.id}`)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                      >
-                        <Merge className="w-4 h-4" />
-                        Gộp
-                      </button>
-                      <button
-                        onClick={() => handleApprove(`${match.seed.id}-${match.registered.id}`)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        Duyệt riêng
-                      </button>
-                      <button
-                        onClick={() => handleReject(`${match.seed.id}-${match.registered.id}`)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-                      >
+                    {/* Arrow / Comparison indicator */}
+                    <div className="hidden md:flex items-center justify-center self-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <ArrowLeftRight className="w-6 h-6 text-gray-400" />
+                        <span className="text-[10px] text-gray-400 font-medium uppercase">So khớp</span>
+                      </div>
+                    </div>
+
+                    {/* Registered Store */}
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4 space-y-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Store className="w-4 h-4 text-emerald-600" />
+                        <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">
+                          Cửa hàng đăng ký
+                        </span>
+                      </div>
+                      <h4 className="font-semibold text-gray-900">{match.registered.name || '—'}</h4>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <p className="flex items-start gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          {match.registered.address || '—'}
+                        </p>
+                        {match.registered.phone && (
+                          <p className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                            {match.registered.phone}
+                          </p>
+                        )}
+                        {match.registered.ownerName && (
+                          <p className="text-gray-500">
+                            Chủ sở hữu: {match.registered.ownerName}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {match.registered.industry && (
+                            <Badge variant="secondary" className="text-xs">
+                              {match.registered.industry}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+
+                {/* Actions */}
+                {match.status === 'pending' && (
+                  <CardFooter className="pt-0 flex items-center justify-end gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={isProcessing}
+                      onClick={() => setConfirmAction({ matchId: match.id, action: 'reject' })}
+                      className="gap-1.5"
+                    >
+                      {isProcessing && confirmAction?.action === 'reject' ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
                         <XCircle className="w-4 h-4" />
-                        Từ chối
-                      </button>
-                    </>
-                  )}
-                  {match.status === 'merged' && (
-                    <span className="text-sm text-green-600 flex items-center gap-1">
-                      <CheckCircle size={16} /> Đã gộp thành công
+                      )}
+                      Từ chối
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={isProcessing}
+                      onClick={() => setConfirmAction({ matchId: match.id, action: 'approve' })}
+                      className="gap-1.5"
+                    >
+                      {isProcessing && confirmAction?.action === 'approve' ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Phê duyệt
+                    </Button>
+                  </CardFooter>
+                )}
+
+                {match.status !== 'pending' && (
+                  <CardFooter className="pt-0 flex items-center justify-end">
+                    <span className="text-sm text-gray-400">
+                      {match.status === 'approved' && '✓ Ghép nối đã được phê duyệt'}
+                      {match.status === 'rejected' && '✗ Ghép nối đã bị từ chối'}
+                      {match.status === 'merged' && '↻ Dữ liệu đã được gộp'}
                     </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
+                  </CardFooter>
+                )}
+              </Card>
+            );
+          })
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmAction?.action === 'approve'
+                ? 'Xác nhận phê duyệt'
+                : 'Xác nhận từ chối'}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmAction?.action === 'approve'
+                ? 'Bạn có chắc chắn muốn phê duyệt ghép nối này? Dữ liệu seed và cửa hàng đăng ký sẽ được liên kết.'
+                : 'Bạn có chắc chắn muốn từ chối ghép nối này? Hành động này có thể được hoàn tác sau.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {confirmAction && (
+            <div className="rounded-lg border p-3 bg-gray-50 text-sm space-y-1">
+              <p>
+                <span className="font-medium">Ghép nối ID:</span>{' '}
+                <code className="bg-gray-200 px-1.5 py-0.5 rounded text-xs">
+                  {confirmAction.matchId}
+                </code>
+              </p>
+              {(() => {
+                const m = matches.find((x) => x.id === confirmAction.matchId);
+                if (!m) return null;
+                return (
+                  <>
+                    <p>
+                      <span className="font-medium">Seed:</span> {m.seed.name}
+                    </p>
+                    <p>
+                      <span className="font-medium">Đăng ký:</span> {m.registered.name}
+                    </p>
+                    <p>
+                      <span className="font-medium">Độ tương đồng:</span> {m.similarity}%
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmAction(null)}
+              disabled={processing !== null}
+            >
+              Huỷ
+            </Button>
+            <Button
+              variant={confirmAction?.action === 'approve' ? 'default' : 'destructive'}
+              onClick={handleConfirmAction}
+              disabled={processing !== null}
+              className="gap-1.5"
+            >
+              {processing && <Loader2 className="w-4 h-4 animate-spin" />}
+              {confirmAction?.action === 'approve' ? 'Phê duyệt' : 'Từ chối'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

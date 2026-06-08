@@ -1,74 +1,109 @@
-import { loadStripe } from '@stripe/stripe-js';
+/**
+ * Stripe integration utilities
+ *
+ * Uses @stripe/stripe-js for client-side Stripe.js loading and
+ * apiService for authenticated backend API calls.
+ */
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { apiService } from '../services/api';
 
-export async function createPaymentIntent(amount: number, currency: string = 'usd', orderId?: string) {
-  try {
-    const response = await fetch('/api/payments/create-intent', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount,
-        currency,
-        order_id: orderId,
-      }),
-    });
+// ---------------------------------------------------------------------------
+// Stripe.js singleton
+// ---------------------------------------------------------------------------
 
-    const data = await response.json();
+const STRIPE_PK =
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
 
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to create payment intent');
-    }
+/**
+ * Load Stripe.js once. Returns `null` when no publishable key is configured,
+ * allowing the UI to fall back to COD-only mode.
+ */
+export const stripePromise: Promise<Stripe | null> = STRIPE_PK
+  ? loadStripe(STRIPE_PK)
+  : Promise.resolve(null);
 
-    return data;
-  } catch (error) {
-    console.error('Error creating payment intent:', error);
-    throw error;
-  }
+/**
+ * Check whether Stripe is configured (publishable key present).
+ */
+export function isStripeConfigured(): boolean {
+  return Boolean(STRIPE_PK);
 }
 
-export async function confirmPayment(paymentIntentId: string, paymentMethodId: string) {
-  try {
-    const response = await fetch('/api/payments/confirm', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        payment_intent_id: paymentIntentId,
-        payment_method_id: paymentMethodId,
-      }),
-    });
+// ---------------------------------------------------------------------------
+// Backend API helpers — all calls go through apiService for auth & base URL
+// ---------------------------------------------------------------------------
 
-    const data = await response.json();
-
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to confirm payment');
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error confirming payment:', error);
-    throw error;
-  }
+export interface CreateIntentResponse {
+  id: string;
+  client_secret: string;
+  amount: number;
+  currency: string;
+  status: string;
 }
 
-export async function getPaymentIntent(paymentIntentId: string) {
-  try {
-    const response = await fetch(`/api/payments/intent/${paymentIntentId}`);
-    const data = await response.json();
-
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to get payment intent');
-    }
-
-    return data.data;
-  } catch (error) {
-    console.error('Error getting payment intent:', error);
-    throw error;
-  }
+export interface ConfirmIntentResponse {
+  id: string;
+  status: string;
+  amount: number;
+  currency: string;
 }
 
-export { stripePromise };
+export interface IntentStatusResponse {
+  id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  metadata: Record<string, string>;
+  created: number;
+}
+
+/**
+ * Create a PaymentIntent on the backend.
+ * The backend returns `{ id, client_secret, amount, currency, status }`.
+ */
+export async function createPaymentIntent(
+  amount: number,
+  currency: string = 'vnd',
+  orderId?: string,
+): Promise<CreateIntentResponse> {
+  const data = await apiService.post<CreateIntentResponse>(
+    '/api/payments/create-intent',
+    {
+      amount,
+      currency,
+      order_id: orderId,
+    },
+  );
+  return data;
+}
+
+/**
+ * Confirm a PaymentIntent on the backend (server-side confirmation).
+ * Used when Stripe client-side confirmation is not available.
+ */
+export async function confirmPaymentIntent(
+  paymentIntentId: string,
+  paymentMethodId: string,
+): Promise<ConfirmIntentResponse> {
+  const data = await apiService.post<ConfirmIntentResponse>(
+    '/api/payments/confirm-intent',
+    {
+      payment_intent_id: paymentIntentId,
+      payment_method_id: paymentMethodId,
+    },
+  );
+  return data;
+}
+
+/**
+ * Retrieve the current status of a PaymentIntent.
+ */
+export async function getPaymentIntentStatus(
+  paymentIntentId: string,
+): Promise<IntentStatusResponse> {
+  const data = await apiService.get<IntentStatusResponse>(
+    `/api/payments/intent/${paymentIntentId}`,
+  );
+  return data;
+}

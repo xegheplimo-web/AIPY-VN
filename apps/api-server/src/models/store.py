@@ -24,6 +24,7 @@ class Store(Base):
     __tablename__ = "stores"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     name = Column(String(200), nullable=False)
     address = Column(Text, nullable=False)
     latitude = Column(Float, nullable=False)

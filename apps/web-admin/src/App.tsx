@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
@@ -27,16 +28,28 @@ export default function App() {
       <AuthProvider>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
+            {/* Public route - NOT protected */}
             <Route path="/login" element={<AdminLoginPage />} />
-            <Route path="/dashboard" element={<AdminDashboardPage />} />
-            <Route path="/stores" element={<StoresManagementPage />} />
-            <Route path="/stores/verification" element={<StoreVerificationPage />} />
-            <Route path="/match-queue" element={<MatchQueuePage />} />
-            <Route path="/users" element={<UserManagementPage />} />
-            <Route path="/reports" element={<ReportModerationPage />} />
-            <Route path="/categories" element={<CategoryManagerPage />} />
-            <Route path="/system" element={<SystemHealthPage />} />
-            <Route path="/" element={<AdminDashboardPage />} />
+
+            {/* Protected admin routes */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <Routes>
+                    <Route path="/dashboard" element={<AdminDashboardPage />} />
+                    <Route path="/stores" element={<StoresManagementPage />} />
+                    <Route path="/stores/verification" element={<StoreVerificationPage />} />
+                    <Route path="/match-queue" element={<MatchQueuePage />} />
+                    <Route path="/users" element={<UserManagementPage />} />
+                    <Route path="/reports" element={<ReportModerationPage />} />
+                    <Route path="/categories" element={<CategoryManagerPage />} />
+                    <Route path="/system" element={<SystemHealthPage />} />
+                    <Route path="/" element={<AdminDashboardPage />} />
+                  </Routes>
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </Suspense>
       </AuthProvider>

@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from src.database import async_session
 from src.middleware.auth_middleware import get_current_user, require_auth
 from src.models.promotion import Promotion
+from src.models.store import Store
 from src.models.user import User
 from src.utils.pagination import paginate, get_pagination_metadata
 
@@ -77,6 +78,23 @@ class PromotionListResponse(BaseModel):
     has_prev: bool
 
 
+async def _get_owner_store_ids(user_id) -> list[str]:
+    """
+    Get the store IDs owned by a given user.
+
+    Args:
+        user_id: The owner's user ID (UUID or string)
+
+    Returns:
+        List of store ID strings
+    """
+    async with async_session() as session:
+        query = select(Store.id).where(Store.owner_id == user_id)
+        result = await session.execute(query)
+        store_ids = result.scalars().all()
+        return [str(sid) for sid in store_ids]
+
+
 @router.get("", response_model=PromotionListResponse)
 async def list_promotions(
     page: int = Query(1, ge=1),
@@ -103,12 +121,35 @@ async def list_promotions(
                 )
             )
 
-        # Owners can only see their own promotions
+        # Owners can only see promotions applicable to their stores
         if current_user.role == "owner":
-            # TODO: Filter by owner's store IDs
-            pass
+            user_id = current_user.id if hasattr(current_user, "id") else current_user.get("id")
+            owner_store_ids = await _get_owner_store_ids(user_id)
 
-        # Count total
+            if owner_store_ids:
+                # Show promotions where:
+                # 1. applicable_stores is empty/null (applies to all stores), OR
+                # 2. applicable_stores contains "all" (applies to all stores), OR
+                # 3. applicable_stores contains any of the owner's store IDs
+                #
+                # Since applicable_stores is a JSON column, we filter in Python
+                # after the initial query for maximum compatibility across
+                # database backends (PostgreSQL JSON, SQLite JSON, etc.).
+                pass  # Filtering applied after query execution below
+            else:
+                # Owner has no stores — return empty list
+                metadata = get_pagination_metadata(0, page, limit)
+                return PromotionListResponse(
+                    promotions=[],
+                    total=0,
+                    page=page,
+                    limit=limit,
+                    total_pages=metadata["total_pages"],
+                    has_next=metadata["has_next"],
+                    has_prev=metadata["has_prev"],
+                )
+
+        # Count total (before owner filtering, we will recount after)
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await session.execute(count_query)
         total = total_result.scalar_one()
@@ -118,6 +159,25 @@ async def list_promotions(
         query = paginate(query, page=page, limit=limit)
         result = await session.execute(query)
         promotions = result.scalars().all()
+
+        # Apply owner store filtering in Python for JSON column compatibility
+        if current_user.role == "owner":
+            user_id = current_user.id if hasattr(current_user, "id") else current_user.get("id")
+            owner_store_ids = await _get_owner_store_ids(user_id)
+
+            if owner_store_ids:
+                filtered_promotions = []
+                for p in promotions:
+                    stores = p.applicable_stores or []
+                    # Promotion applies to all stores (empty list, ["all"], or None)
+                    if not stores or "all" in stores:
+                        filtered_promotions.append(p)
+                    else:
+                        # Check if any of the owner's store IDs are in the applicable_stores
+                        if any(str(sid) in stores for sid in owner_store_ids):
+                            filtered_promotions.append(p)
+                promotions = filtered_promotions
+                total = len(filtered_promotions)
 
         # Get pagination metadata
         metadata = get_pagination_metadata(total, page, limit)
@@ -169,6 +229,8 @@ async def create_promotion(
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Promotion code already exists")
 
+        user_id = current_user.id if hasattr(current_user, "id") else current_user.get("id")
+
         new_promotion = Promotion(
             id=uuid.uuid4(),
             code=promotion.code.upper(),
@@ -182,7 +244,7 @@ async def create_promotion(
             start_date=promotion.start_date,
             end_date=promotion.end_date,
             applicable_stores=promotion.applicable_stores,
-            created_by=current_user.id,
+            created_by=user_id,
             status="active",
         )
 
@@ -228,6 +290,15 @@ async def get_promotion(
         if not promotion:
             raise HTTPException(status_code=404, detail="Promotion not found")
 
+        # Owners can only view promotions applicable to their stores
+        if current_user.role == "owner":
+            user_id = current_user.id if hasattr(current_user, "id") else current_user.get("id")
+            owner_store_ids = await _get_owner_store_ids(user_id)
+            stores = promotion.applicable_stores or []
+            if stores and "all" not in stores:
+                if not any(str(sid) in stores for sid in owner_store_ids):
+                    raise HTTPException(status_code=403, detail="Not authorized to view this promotion")
+
         return PromotionResponse(
             id=str(promotion.id),
             code=promotion.code,
@@ -267,6 +338,15 @@ async def update_promotion(
 
         if not db_promotion:
             raise HTTPException(status_code=404, detail="Promotion not found")
+
+        # Owners can only update promotions applicable to their stores
+        if current_user.role == "owner":
+            user_id = current_user.id if hasattr(current_user, "id") else current_user.get("id")
+            owner_store_ids = await _get_owner_store_ids(user_id)
+            stores = db_promotion.applicable_stores or []
+            if stores and "all" not in stores:
+                if not any(str(sid) in stores for sid in owner_store_ids):
+                    raise HTTPException(status_code=403, detail="Not authorized to update this promotion")
 
         # Update fields
         if promotion.name is not None:
@@ -331,6 +411,15 @@ async def delete_promotion(
 
         if not promotion:
             raise HTTPException(status_code=404, detail="Promotion not found")
+
+        # Owners can only delete promotions applicable to their stores
+        if current_user.role == "owner":
+            user_id = current_user.id if hasattr(current_user, "id") else current_user.get("id")
+            owner_store_ids = await _get_owner_store_ids(user_id)
+            stores = promotion.applicable_stores or []
+            if stores and "all" not in stores:
+                if not any(str(sid) in stores for sid in owner_store_ids):
+                    raise HTTPException(status_code=403, detail="Not authorized to delete this promotion")
 
         await session.delete(promotion)
         await session.commit()

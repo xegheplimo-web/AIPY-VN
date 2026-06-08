@@ -1,13 +1,42 @@
 import {
   Ban,
-  MoreVertical,
+  Loader2,
+  MoreHorizontal,
   Phone,
+  RefreshCw,
   Search,
+  ShieldAlert,
   ShieldCheck,
+  UserCog,
   User as UserIcon,
+  Users,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import api from '../services/api';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { DataTable } from '../components/ui/DataTable';
+import type { ColumnDef } from '@tanstack/react-table';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface User {
   id: string;
@@ -18,154 +47,430 @@ interface User {
   status: 'active' | 'suspended' | 'banned';
   createdAt: Date;
   lastLogin?: Date;
-  addresses: number;
-  orders: number;
 }
+
+type RoleFilter = 'all' | 'customer' | 'owner' | 'admin';
+
+interface ConfirmDialogState {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  variant: 'destructive' | 'default';
+  onConfirm: () => void;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getStatusBadge(status: string) {
+  const config = {
+    active: { label: 'Hoạt động', className: 'bg-green-100 text-green-700 border-green-200' },
+    suspended: { label: 'Tạm khóa', className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+    banned: { label: 'Đã khóa', className: 'bg-red-100 text-red-700 border-red-200' },
+  } as const;
+  const entry = config[status as keyof typeof config] ?? config.active;
+  return (
+    <Badge variant="outline" className={entry.className}>
+      {entry.label}
+    </Badge>
+  );
+}
+
+function getRoleBadge(role: string) {
+  const config = {
+    customer: { label: 'Khách hàng', className: 'bg-sky-100 text-sky-700 border-sky-200' },
+    owner: { label: 'Chủ cửa hàng', className: 'bg-violet-100 text-violet-700 border-violet-200' },
+    admin: { label: 'Quản trị viên', className: 'bg-rose-100 text-rose-700 border-rose-200' },
+  } as const;
+  const entry = config[role as keyof typeof config] ?? config.customer;
+  return (
+    <Badge variant="outline" className={entry.className}>
+      {entry.label}
+    </Badge>
+  );
+}
+
+function formatDate(date: Date): string {
+  try {
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return '—';
+  }
+}
+
+/**
+ * Safely extract the users array from a potentially nested API response.
+ * Handles: { users: [...] }, { data: { users: [...] } }, { data: [...] }
+ */
+function extractUsers(response: any): any[] {
+  if (Array.isArray(response)) return response;
+  if (response?.users && Array.isArray(response.users)) return response.users;
+  if (response?.data?.users && Array.isArray(response.data.users)) return response.data.users;
+  if (response?.data && Array.isArray(response.data)) return response.data;
+  return [];
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [filter, setFilter] = useState<'all' | 'active' | 'suspended' | 'banned'>('all');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'customer' | 'owner' | 'admin'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
 
-  const loadUsers = async () => {
+  // Confirmation dialog
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
+    open: false,
+    title: '',
+    description: '',
+    confirmLabel: '',
+    variant: 'default',
+    onConfirm: () => {},
+  });
+
+  // Ban reason dialog
+  const [banDialog, setBanDialog] = useState<{ open: boolean; userId: string; reason: string }>({
+    open: false,
+    userId: '',
+    reason: '',
+  });
+
+  // Loading state for individual actions
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // ─── Load Users ──────────────────────────────────────────────────────────
+
+  const loadUsers = useCallback(async () => {
     try {
-      // Mock data - sẽ thay bằng API call sau
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          name: 'Nguyễn Văn A',
-          email: 'nguyenvana@example.com',
-          phone: '0901234567',
-          role: 'customer',
-          status: 'active',
-          createdAt: new Date('2024-01-15'),
-          lastLogin: new Date(),
-          addresses: 2,
-          orders: 15,
-        },
-        {
-          id: '2',
-          name: 'Trần Thị B',
-          email: 'tranhib@example.com',
-          phone: '0912345678',
-          role: 'owner',
-          status: 'active',
-          createdAt: new Date('2024-02-20'),
-          lastLogin: new Date(),
-          addresses: 1,
-          orders: 45,
-        },
-        {
-          id: '3',
-          name: 'Lê Văn C',
-          email: 'levanc@example.com',
-          phone: '0923456789',
-          role: 'customer',
-          status: 'suspended',
-          createdAt: new Date('2024-03-10'),
-          lastLogin: new Date('2024-05-01'),
-          addresses: 1,
-          orders: 8,
-        },
-        {
-          id: '4',
-          name: 'Admin User',
-          email: 'admin@aishop.vn',
-          phone: '0934567890',
-          role: 'admin',
-          status: 'active',
-          createdAt: new Date('2024-01-01'),
-          lastLogin: new Date(),
-          addresses: 0,
-          orders: 0,
-        },
-      ];
-      setUsers(mockUsers);
-    } catch (err) {
+      setLoading(true);
+      setError(null);
+      const response = await api.getUsers({ limit: 500 });
+      const rawUsers = extractUsers(response);
+
+      const transformed: User[] = rawUsers.map((u: any) => ({
+        id: u.id ?? u._id ?? '',
+        name: u.name ?? u.full_name ?? u.displayName ?? '',
+        email: u.email ?? '',
+        phone: u.phone ?? '',
+        role: u.role ?? 'customer',
+        status: u.status ?? 'active',
+        createdAt: u.createdAt ? new Date(u.createdAt) : u.created_at ? new Date(u.created_at) : new Date(),
+        lastLogin: u.lastLogin ? new Date(u.lastLogin) : u.last_login ? new Date(u.last_login) : undefined,
+      }));
+
+      setUsers(transformed);
+    } catch (err: any) {
       console.error('Failed to load users:', err);
+      setError(err?.message ?? 'Không thể tải danh sách người dùng. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  // ─── Actions ─────────────────────────────────────────────────────────────
+
+  const handleSuspend = (userId: string, userName: string) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Tạm khóa người dùng',
+      description: `Bạn có chắc muốn tạm khóa tài khoản "${userName}"? Người dùng sẽ không thể đăng nhập cho đến khi được kích hoạt lại.`,
+      confirmLabel: 'Tạm khóa',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          setActionLoading(userId);
+          await api.suspendUser(userId);
+          toast.success(`Đã tạm khóa tài khoản "${userName}"`);
+          setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: 'suspended' as const } : u)));
+        } catch (err: any) {
+          toast.error(err?.message ?? 'Tạm khóa tài khoản thất bại');
+        } finally {
+          setActionLoading(null);
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+        }
+      },
+    });
   };
 
-  const handleSuspend = async (userId: string) => {
+  const handleBan = (userId: string) => {
+    setBanDialog({ open: true, userId, reason: '' });
+  };
+
+  const confirmBan = async () => {
+    const { userId, reason } = banDialog;
+    const userName = users.find((u) => u.id === userId)?.name ?? '';
     try {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, status: 'suspended' as const } : u))
-      );
-    } catch (err) {
-      alert('Khóa tài khoản thất bại');
+      setActionLoading(userId);
+      await api.banUser(userId, reason || 'Vi phạm chính sách');
+      toast.success(`Đã khóa tài khoản "${userName}"`);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: 'banned' as const } : u)));
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Khóa tài khoản thất bại');
+    } finally {
+      setActionLoading(null);
+      setBanDialog({ open: false, userId: '', reason: '' });
     }
   };
 
-  const handleBan = async (userId: string) => {
-    const reason = prompt('Lý do khóa tài khoản:');
-    if (!reason) return;
-
+  const handleActivate = async (userId: string, userName: string) => {
     try {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, status: 'banned' as const } : u))
-      );
-    } catch (err) {
-      alert('Khóa tài khoản thất bại');
+      setActionLoading(userId);
+      await api.activateUser(userId);
+      toast.success(`Đã kích hoạt tài khoản "${userName}"`);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: 'active' as const } : u)));
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Kích hoạt tài khoản thất bại');
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const handleActivate = async (userId: string) => {
-    try {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, status: 'active' as const } : u))
-      );
-    } catch (err) {
-      alert('Kích hoạt tài khoản thất bại');
-    }
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    const userName = users.find((u) => u.id === userId)?.name ?? '';
+    const roleLabels: Record<string, string> = {
+      customer: 'Khách hàng',
+      owner: 'Chủ cửa hàng',
+      admin: 'Quản trị viên',
+    };
+    setConfirmDialog({
+      open: true,
+      title: 'Thay đổi vai trò',
+      description: `Bạn có chắc muốn thay đổi vai trò của "${userName}" thành "${roleLabels[newRole] ?? newRole}"?`,
+      confirmLabel: 'Xác nhận',
+      variant: 'default',
+      onConfirm: async () => {
+        try {
+          setActionLoading(userId);
+          await api.updateUserRole(userId, newRole);
+          toast.success(`Đã cập nhật vai trò của "${userName}"`);
+          setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole as User['role'] } : u)));
+        } catch (err: any) {
+          toast.error(err?.message ?? 'Cập nhật vai trò thất bại');
+        } finally {
+          setActionLoading(null);
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+        }
+      },
+    });
   };
+
+  // ─── Computed Values ─────────────────────────────────────────────────────
 
   const filteredUsers = users.filter((u) => {
-    const matchesFilter = filter === 'all' || u.status === filter;
     const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      searchQuery === '' ||
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.phone.includes(searchQuery);
-    return matchesFilter && matchesRole && matchesSearch;
+      q === '' ||
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.phone.includes(q) ||
+      u.role.toLowerCase().includes(q);
+    return matchesRole && matchesSearch;
   });
 
-  const getStatusBadge = (status: string) => {
-    const config = {
-      active: { label: 'Hoạt động', color: 'bg-green-100 text-green-700' },
-      suspended: { label: 'Tạm khóa', color: 'bg-yellow-100 text-yellow-700' },
-      banned: { label: 'Đã khóa', color: 'bg-red-100 text-red-700' },
-    };
-    const { label, color } = config[status as keyof typeof config];
-    return <span className={`px-3 py-1 rounded-full text-xs font-medium ${color}`}>{label}</span>;
+  const stats = {
+    total: users.length,
+    active: users.filter((u) => u.status === 'active').length,
+    suspended: users.filter((u) => u.status === 'suspended').length,
+    banned: users.filter((u) => u.status === 'banned').length,
   };
 
-  const getRoleBadge = (role: string) => {
-    const config = {
-      customer: { label: 'Khách hàng', color: 'bg-blue-100 text-blue-700' },
-      owner: { label: 'Chủ cửa hàng', color: 'bg-purple-100 text-purple-700' },
-      admin: { label: 'Quản trị viên', color: 'bg-red-100 text-red-700' },
-    };
-    const { label, color } = config[role as keyof typeof config];
-    return <span className={`px-3 py-1 rounded-full text-xs font-medium ${color}`}>{label}</span>;
-  };
+  const roleTabs: { value: RoleFilter; label: string; count: number }[] = [
+    { value: 'all', label: 'Tất cả', count: stats.total },
+    { value: 'customer', label: 'Khách hàng', count: users.filter((u) => u.role === 'customer').length },
+    { value: 'owner', label: 'Chủ cửa hàng', count: users.filter((u) => u.role === 'owner').length },
+    { value: 'admin', label: 'Quản trị viên', count: users.filter((u) => u.role === 'admin').length },
+  ];
 
-  if (loading) {
+  // ─── Table Columns ───────────────────────────────────────────────────────
+
+  const columns: ColumnDef<User>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Người dùng',
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <UserIcon className="w-4 h-4 text-sky-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium text-gray-900 truncate">{user.name}</p>
+              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'phone',
+      header: 'Liên hệ',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+          <Phone size={14} className="text-gray-400 flex-shrink-0" />
+          <span>{row.original.phone || '—'}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'role',
+      header: 'Vai trò',
+      cell: ({ row }) => getRoleBadge(row.original.role),
+      filterFn: (row, _columnId, filterValue) => {
+        if (filterValue === 'all') return true;
+        return row.original.role === filterValue;
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Trạng thái',
+      cell: ({ row }) => getStatusBadge(row.original.status),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Ngày tham gia',
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600">{formatDate(row.original.createdAt)}</span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Hành động',
+      cell: ({ row }) => {
+        const user = row.original;
+        const isLoading = actionLoading === user.id;
+
+        return (
+          <div className="flex items-center justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isLoading}>
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MoreHorizontal className="h-4 w-4" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel>Hành động</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                {/* Activate / Suspend / Ban based on current status */}
+                {user.status === 'active' && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => handleSuspend(user.id, user.name)}
+                      className="text-yellow-700 focus:text-yellow-700 focus:bg-yellow-50 cursor-pointer"
+                    >
+                      <Ban className="mr-2 h-4 w-4" />
+                      Tạm khóa
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleBan(user.id)}
+                      className="text-red-700 focus:text-red-700 focus:bg-red-50 cursor-pointer"
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Khóa tài khoản
+                    </DropdownMenuItem>
+                  </>
+                )}
+
+                {(user.status === 'suspended' || user.status === 'banned') && (
+                  <DropdownMenuItem
+                    onClick={() => handleActivate(user.id, user.name)}
+                    className="text-green-700 focus:text-green-700 focus:bg-green-50 cursor-pointer"
+                  >
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Kích hoạt
+                  </DropdownMenuItem>
+                )}
+
+                {user.status === 'suspended' && (
+                  <DropdownMenuItem
+                    onClick={() => handleBan(user.id)}
+                    className="text-red-700 focus:text-red-700 focus:bg-red-50 cursor-pointer"
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Khóa tài khoản
+                  </DropdownMenuItem>
+                )}
+
+                {user.status === 'banned' && (
+                  <DropdownMenuItem
+                    onClick={() => handleSuspend(user.id, user.name)}
+                    className="text-yellow-700 focus:text-yellow-700 focus:bg-yellow-50 cursor-pointer"
+                  >
+                    <Ban className="mr-2 h-4 w-4" />
+                    Chuyển sang tạm khóa
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Thay đổi vai trò</DropdownMenuLabel>
+
+                {(['customer', 'owner', 'admin'] as const)
+                  .filter((r) => r !== user.role)
+                  .map((role) => (
+                    <DropdownMenuItem
+                      key={role}
+                      onClick={() => handleRoleChange(user.id, role)}
+                      className="cursor-pointer"
+                    >
+                      <UserCog className="mr-2 h-4 w-4" />
+                      {role === 'customer' ? 'Khách hàng' : role === 'owner' ? 'Chủ cửa hàng' : 'Quản trị viên'}
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // ─── Render: Loading ─────────────────────────────────────────────────────
+
+  if (loading && users.length === 0) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+        <p className="text-gray-500 text-sm">Đang tải danh sách người dùng...</p>
       </div>
     );
   }
+
+  // ─── Render: Error ───────────────────────────────────────────────────────
+
+  if (error && users.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
+        <ShieldAlert className="h-12 w-12 text-red-400" />
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">Không thể tải dữ liệu</h2>
+          <p className="text-gray-500 text-sm max-w-md">{error}</p>
+        </div>
+        <Button onClick={loadUsers} variant="outline" className="gap-2">
+          <RefreshCw className="h-4 w-4" />
+          Thử lại
+        </Button>
+      </div>
+    );
+  }
+
+  // ─── Render: Main ────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -173,267 +478,184 @@ export default function UserManagementPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Quản lý người dùng</h1>
-          <p className="text-gray-500 mt-1">Quản lý tài khoản người dùng</p>
+          <p className="text-gray-500 mt-1">Quản lý tài khoản và phân quyền người dùng</p>
         </div>
+        <Button onClick={loadUsers} variant="outline" size="sm" className="gap-2" disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Làm mới
+        </Button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border p-4">
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm người dùng..."
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex gap-2">
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
-              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Hoạt động</option>
-              <option value="suspended">Tạm khóa</option>
-              <option value="banned">Đã khóa</option>
-            </select>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as any)}
-              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Tất cả vai trò</option>
-              <option value="customer">Khách hàng</option>
-              <option value="owner">Chủ cửa hàng</option>
-              <option value="admin">Quản trị viên</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
+      {/* Stats Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Tổng số</p>
-              <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
-            <UserIcon className="w-8 h-8 text-gray-400" />
+            <Users className="w-8 h-8 text-gray-400" />
           </div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
+        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Hoạt động</p>
-              <p className="text-2xl font-bold text-green-600">
-                {users.filter((u) => u.status === 'active').length}
-              </p>
+              <p className="text-2xl font-bold text-green-600">{stats.active}</p>
             </div>
             <ShieldCheck className="w-8 h-8 text-green-500" />
           </div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
+        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Tạm khóa</p>
-              <p className="text-2xl font-bold text-yellow-600">
-                {users.filter((u) => u.status === 'suspended').length}
-              </p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.suspended}</p>
             </div>
             <Ban className="w-8 h-8 text-yellow-500" />
           </div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-200">
+        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Đã khóa</p>
-              <p className="text-2xl font-bold text-red-600">
-                {users.filter((u) => u.status === 'banned').length}
-              </p>
+              <p className="text-2xl font-bold text-red-600">{stats.banned}</p>
             </div>
             <XCircle className="w-8 h-8 text-red-500" />
           </div>
         </div>
       </div>
 
-      {/* User List */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-gray-50">
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Người dùng</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Liên hệ</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Vai trò</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Trạng thái</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Ngày tham gia</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUsers.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-center py-12 text-gray-500">
-                  Không tìm thấy kết quả
-                </td>
-              </tr>
-            ) : (
-              filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b hover:bg-gray-50">
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <UserIcon className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{user.name}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">
-                    <div className="space-y-1 text-sm">
-                      <div className="flex items-center gap-1 text-gray-600">
-                        <Phone size={14} /> {user.phone}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4">{getRoleBadge(user.role)}</td>
-                  <td className="py-4 px-4">{getStatusBadge(user.status)}</td>
-                  <td className="py-4 px-4 text-sm text-gray-600">
-                    {user.createdAt.toLocaleDateString('vi-VN')}
-                  </td>
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => setSelectedUser(user)}
-                        className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
-                        title="Xem chi tiết"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                      {user.status === 'active' && (
-                        <>
-                          <button
-                            onClick={() => handleSuspend(user.id)}
-                            className="p-2 bg-yellow-100 text-yellow-600 rounded-lg hover:bg-yellow-200"
-                            title="Tạm khóa"
-                          >
-                            <Ban className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleBan(user.id)}
-                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
-                            title="Khóa tài khoản"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      {user.status !== 'active' && (
-                        <button
-                          onClick={() => handleActivate(user.id)}
-                          className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200"
-                          title="Kích hoạt"
-                        >
-                          <ShieldCheck className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* Role Filter Tabs + Search */}
+      <div className="bg-white rounded-xl shadow-sm border p-4 space-y-4">
+        {/* Role Tabs */}
+        <div className="flex flex-wrap gap-2">
+          {roleTabs.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setRoleFilter(tab.value)}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                roleFilter === tab.value
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {tab.label}
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  roleFilter === tab.value ? 'bg-blue-500 text-blue-100' : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm theo tên, email, số điện thoại..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          />
+        </div>
       </div>
 
-      {/* Detail Modal */}
-      {selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-bold">Chi tiết người dùng</h2>
-              <button
-                onClick={() => setSelectedUser(null)}
-                className="p-2 hover:bg-gray-100 rounded"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                  <UserIcon className="w-8 h-8 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">{selectedUser.name}</h3>
-                  <p className="text-gray-500">{selectedUser.email}</p>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Số điện thoại:</span>
-                  <span className="font-medium">{selectedUser.phone}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Vai trò:</span>
-                  <span>{getRoleBadge(selectedUser.role)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Trạng thái:</span>
-                  <span>{getStatusBadge(selectedUser.status)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Ngày tham gia:</span>
-                  <span className="font-medium">
-                    {selectedUser.createdAt.toLocaleDateString('vi-VN')}
-                  </span>
-                </div>
-                {selectedUser.lastLogin && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Đăng nhập lần cuối:</span>
-                    <span className="font-medium">
-                      {selectedUser.lastLogin.toLocaleString('vi-VN')}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Số địa chỉ:</span>
-                  <span className="font-medium">{selectedUser.addresses}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Số đơn hàng:</span>
-                  <span className="font-medium">{selectedUser.orders}</span>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 border-t flex gap-3 justify-end">
-              <button
-                onClick={() => setSelectedUser(null)}
-                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-              >
-                Đóng
-              </button>
-              {selectedUser.status === 'active' && (
-                <button
-                  onClick={() => {
-                    handleSuspend(selectedUser.id);
-                    setSelectedUser(null);
-                  }}
-                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
-                >
-                  Tạm khóa
-                </button>
-              )}
-            </div>
-          </div>
+      {/* Error banner (when data exists but refetch failed) */}
+      {error && users.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
+          <p className="text-sm text-red-700">{error}</p>
+          <Button onClick={loadUsers} variant="outline" size="sm" className="gap-1 text-red-700 border-red-300 hover:bg-red-100">
+            <RefreshCw className="h-3.5 w-3.5" />
+            Thử lại
+          </Button>
         </div>
       )}
+
+      {/* Data Table */}
+      <div className="bg-white rounded-xl shadow-sm border">
+        <DataTable
+          columns={columns}
+          data={filteredUsers}
+          searchKey="name"
+          searchable={false}
+        />
+      </div>
+
+      {/* ─── Confirmation Dialog (Suspend / Role Change) ─────────────────── */}
+      <Dialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDialog((prev) => ({ ...prev, open: false }));
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{confirmDialog.title}</DialogTitle>
+            <DialogDescription>{confirmDialog.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant={confirmDialog.variant === 'destructive' ? 'destructive' : 'default'}
+              onClick={confirmDialog.onConfirm}
+            >
+              {confirmDialog.confirmLabel}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Ban Reason Dialog ────────────────────────────────────────────── */}
+      <Dialog
+        open={banDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setBanDialog({ open: false, userId: '', reason: '' });
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Khóa tài khoản</DialogTitle>
+            <DialogDescription>
+              Vui lòng nhập lý do khóa tài khoản. Người dùng sẽ bị vô hiệu hóa hoàn toàn.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label htmlFor="ban-reason" className="text-sm font-medium text-gray-700 mb-1.5 block">
+              Lý do khóa
+            </label>
+            <textarea
+              id="ban-reason"
+              value={banDialog.reason}
+              onChange={(e) => setBanDialog((prev) => ({ ...prev, reason: e.target.value }))}
+              placeholder="Nhập lý do khóa tài khoản..."
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm resize-none"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setBanDialog({ open: false, userId: '', reason: '' })}
+            >
+              Hủy
+            </Button>
+            <Button variant="destructive" onClick={confirmBan}>
+              <XCircle className="mr-2 h-4 w-4" />
+              Khóa tài khoản
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

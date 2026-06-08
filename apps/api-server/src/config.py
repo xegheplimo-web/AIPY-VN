@@ -115,6 +115,21 @@ class SentryConfig(BaseModel):
         return bool(self.dsn)
 
 
+class SMTPConfig(BaseModel):
+    """SMTP configuration for email sending."""
+
+    host: str = Field(default="", alias="SMTP_HOST")
+    port: int = Field(default=587, alias="SMTP_PORT")
+    user: str = Field(default="", alias="SMTP_USER")
+    password: str = Field(default="", alias="SMTP_PASSWORD")
+    from_email: str = Field(default="", alias="SMTP_FROM_EMAIL")
+    use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
+
+    def is_configured(self) -> bool:
+        """Check if SMTP is properly configured."""
+        return bool(self.host and self.user and self.password and self.from_email)
+
+
 class StripeConfig(BaseModel):
     """Stripe configuration for payment processing."""
 
@@ -181,6 +196,9 @@ class AppConfig(BaseSettings):
 
     # Sentry
     sentry: SentryConfig = Field(default_factory=SentryConfig)
+
+    # SMTP
+    smtp: SMTPConfig = Field(default_factory=SMTPConfig)
 
     # Stripe
     stripe: StripeConfig = Field(default_factory=StripeConfig)

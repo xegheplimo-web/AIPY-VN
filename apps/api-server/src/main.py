@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 from src.api import (
     admin,
     cart,
@@ -275,6 +276,11 @@ app.include_router(categories)
 app.include_router(favorites)
 app.include_router(store_locator)
 app.include_router(geo)
+
+# Static file mount for uploaded files (avatars, etc.)
+uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 @app.get("/health")
