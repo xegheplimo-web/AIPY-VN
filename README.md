@@ -76,7 +76,7 @@ cp apps/api-server/.env.example apps/api-server/.env
 
 ```env
 # Database
-DATABASE_URL=postgresql+asyncpg://username:password@localhost:5432/vietstore
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/vietstore
 
 # Redis
 REDIS_URL=redis://localhost:6379/0
