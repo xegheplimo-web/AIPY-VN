@@ -118,21 +118,79 @@ export interface Address {
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:9000';
 
 class ApiService {
+  private token: string | null = null;
+
+  setToken(token: string) {
+    this.token = token;
+    localStorage.setItem('auth_token', token);
+  }
+
+  getToken(): string | null {
+    if (!this.token) {
+      this.token = localStorage.getItem('auth_token');
+    }
+    return this.token;
+  }
+
+  clearToken() {
+    this.token = null;
+    localStorage.removeItem('auth_token');
+  }
+
+  private getAuthHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    const token = this.getToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    return headers;
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE}${endpoint}`;
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...this.getAuthHeaders(),
         ...options.headers,
       },
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+      throw new Error(error.message || `API Error: ${response.status} ${response.statusText}`);
     }
 
     return response.json();
+  }
+
+  // Auth
+  async login(email: string, password: string) {
+    return this.request<{ access_token: string; refresh_token: string; user: User }>(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }
+    );
+  }
+
+  async register(data: { email: string; password: string; full_name?: string; phone?: string }) {
+    return this.request<{ access_token: string; refresh_token: string; user: User }>(
+      '/api/auth/register',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async logout() {
+    this.clearToken();
   }
 
   // Search
@@ -166,26 +224,26 @@ class ApiService {
   }
 
   // Cart
-  async getCart(): Promise<CartItem[]> {
-    return this.request<CartItem[]>('/api/cart');
+  async getCart(): Promise<{ items: CartItem[] }> {
+    return this.request<{ items: CartItem[] }>('/api/cart');
   }
 
-  async addToCart(productId: string, quantity: number = 1): Promise<CartItem[]> {
-    return this.request<CartItem[]>('/api/cart', {
+  async addToCart(productId: string, quantity: number = 1): Promise<{ items: CartItem[] }> {
+    return this.request<{ items: CartItem[] }>('/api/cart', {
       method: 'POST',
       body: JSON.stringify({ product_id: productId, quantity }),
     });
   }
 
-  async updateCartItem(productId: string, quantity: number): Promise<CartItem[]> {
-    return this.request<CartItem[]>('/api/cart', {
+  async updateCartItem(itemId: string, quantity: number): Promise<{ items: CartItem[] }> {
+    return this.request<{ items: CartItem[] }>(`/api/cart/items/${itemId}`, {
       method: 'PUT',
-      body: JSON.stringify({ product_id: productId, quantity }),
+      body: JSON.stringify({ quantity }),
     });
   }
 
-  async removeFromCart(productId: string): Promise<CartItem[]> {
-    return this.request<CartItem[]>(`/api/cart/${productId}`, {
+  async removeFromCart(itemId: string): Promise<{ items: CartItem[] }> {
+    return this.request<{ items: CartItem[] }>(`/api/cart/items/${itemId}`, {
       method: 'DELETE',
     });
   }
@@ -196,6 +254,11 @@ class ApiService {
     items: Array<{ product_id: string; quantity: number; unit_price: number }>;
     delivery_method: 'pickup' | 'delivery';
     shipping_address?: string;
+    customer_name?: string;
+    customer_phone?: string;
+    customer_email?: string;
+    notes?: string;
+    payment_method?: string;
   }): Promise<Order> {
     return this.request<Order>('/api/orders', {
       method: 'POST',
@@ -203,8 +266,8 @@ class ApiService {
     });
   }
 
-  async getOrders(): Promise<Order[]> {
-    return this.request<Order[]>('/api/orders');
+  async getOrders(): Promise<{ orders: Order[] }> {
+    return this.request<{ orders: Order[] }>('/api/orders');
   }
 
   async getOrder(id: string): Promise<Order> {
@@ -214,6 +277,13 @@ class ApiService {
   // Geo
   async getNearbyStores(lat: number, lng: number, radiusKm: number = 5): Promise<Store[]> {
     return this.request<Store[]>(`/api/geo/nearby?lat=${lat}&lng=${lng}&radius_km=${radiusKm}`);
+  }
+
+  // Promotions
+  async validatePromotion(code: string, orderAmount: number) {
+    return this.request<{ valid: boolean; discount: number; type: string }>(
+      `/api/v1/promotions/validate/${code}?order_amount=${orderAmount}`
+    );
   }
 }
 

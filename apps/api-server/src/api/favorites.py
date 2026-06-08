@@ -1,96 +1,236 @@
 """
-Favorites API
+Favorites/Wishlist API for VietStore RAG.
 
-Endpoints for managing user favorites/wishlist.
+Endpoints for managing user favorite products.
 """
 
-import logging
+from typing import List, Optional
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
+
 from src.database import async_session
 from src.middleware.auth_middleware import require_auth
+from src.models.favorite import Favorite
 from src.models.store import Product
 from src.models.user import User
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/api/users/me/favorites", tags=["Favorites"])
+router = APIRouter(prefix="/api/favorites", tags=["Favorites"])
 
 
-class FavoriteResponse(BaseModel):
-    """Response model for favorite product."""
+# ─── Pydantic Schemas ───────────────────────────────────────────────────────
+
+
+class FavoriteItem(BaseModel):
+    """A favorite item with product details."""
 
     id: str
-    user_id: str
     product_id: str
-    product_name: str
-    product_price: float
-    product_image: str | None
-    store_id: str
+    name: str
+    price: float
+    image_url: Optional[str] = None
     store_name: str
-    created_at: str
-    model_config = {"from_attributes": True}
-@router.get("", response_model=list[FavoriteResponse])
-async def get_favorites(current_user: User = Depends(require_auth)):
-    """
-    Get all favorite products for the current user.
+    added_at: str
 
-    - Returns list of products with store information
-    """
+    class Config:
+        from_attributes = True
+
+
+class FavoriteListResponse(BaseModel):
+    """Response for listing favorites."""
+
+    items: List[FavoriteItem]
+    total: int
+
+
+class FavoriteToggleRequest(BaseModel):
+    """Request to add/remove a favorite."""
+
+    product_id: str = Field(
+        ..., description="UUID of the product to favorite/unfavorite"
+    )
+
+
+class FavoriteToggleResponse(BaseModel):
+    """Response after toggling a favorite."""
+
+    product_id: str
+    is_favorite: bool
+    message: str
+
+
+class FavoriteCheckResponse(BaseModel):
+    """Response for checking if a product is favorited."""
+
+    product_id: str
+    is_favorite: bool
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+async def _get_favorites_query(user_id: uuid.UUID):
+    """Build query for fetching user's favorites with product details."""
+    return (
+        select(Favorite, Product)
+        .join(Product, Favorite.product_id == Product.id)
+        .where(Favorite.user_id == user_id)
+        .order_by(Favorite.created_at.desc())
+    )
+
+
+# ─── Routes ───────────────────────────────────────────────────────────────────
+
+
+@router.get("/", response_model=FavoriteListResponse)
+async def list_favorites(current_user: User = Depends(require_auth)):
+    """Get all favorite products for the current user."""
     async with async_session() as session:
-        # Query favorites with product and store info
-        # Note: Since we don't have a Favorite model yet, we'll use a placeholder
-        # In production, you would have a Favorite model with user_id and product_id
+        query = await _get_favorites_query(current_user.id)
+        result = await session.execute(query)
+        rows = result.all()
 
-        # For now, return empty list as placeholder
-        return []
+        items = []
+        for fav, product in rows:
+            # Get store name via relationship
+            store_name = product.store.name if product.store else "Unknown"
+            images = product.images or []
+            image_url = images[0] if isinstance(images, list) and images else None
+            if not image_url and isinstance(images, dict):
+                image_url = images.get("thumbnail") or images.get("main")
+
+            items.append(
+                FavoriteItem(
+                    id=str(fav.id),
+                    product_id=str(product.id),
+                    name=product.name,
+                    price=float(product.price) if product.price else 0.0,
+                    image_url=image_url,
+                    store_name=store_name,
+                    added_at=fav.created_at,
+                )
+            )
+
+        return FavoriteListResponse(items=items, total=len(items))
 
 
-@router.post("/products/{product_id}", status_code=201)
-async def add_favorite(
+@router.post("/toggle", response_model=FavoriteToggleResponse)
+async def toggle_favorite(
+    data: FavoriteToggleRequest,
+    current_user: User = Depends(require_auth),
+):
+    """Add or remove a product from favorites (toggle behavior)."""
+    try:
+        product_uuid = uuid.UUID(data.product_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid product_id format",
+        )
+
+    async with async_session() as session:
+        # Check if product exists
+        product_result = await session.execute(
+            select(Product).where(Product.id == product_uuid)
+        )
+        product = product_result.scalar_one_or_none()
+        if not product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found",
+            )
+
+        # Check existing favorite
+        existing_result = await session.execute(
+            select(Favorite).where(
+                Favorite.user_id == current_user.id,
+                Favorite.product_id == product_uuid,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+
+        if existing:
+            # Remove from favorites
+            await session.delete(existing)
+            await session.commit()
+            return FavoriteToggleResponse(
+                product_id=data.product_id,
+                is_favorite=False,
+                message="Removed from favorites",
+            )
+        else:
+            # Add to favorites
+            favorite = Favorite(
+                id=uuid.uuid4(),
+                user_id=current_user.id,
+                product_id=product_uuid,
+            )
+            session.add(favorite)
+            await session.commit()
+            return FavoriteToggleResponse(
+                product_id=data.product_id,
+                is_favorite=True,
+                message="Added to favorites",
+            )
+
+
+@router.get("/check/{product_id}", response_model=FavoriteCheckResponse)
+async def check_favorite(
     product_id: str,
     current_user: User = Depends(require_auth),
 ):
-    """
-    Add a product to user's favorites.
+    """Check if a specific product is in the user's favorites."""
+    try:
+        product_uuid = uuid.UUID(product_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid product_id format",
+        )
 
-    - User can only favorite a product once
-    """
     async with async_session() as session:
-        # Verify product exists
-        product_query = select(Product).where(Product.id == product_id)
-        product_result = await session.execute(product_query)
-        product = product_result.scalar_one_or_none()
+        result = await session.execute(
+            select(Favorite).where(
+                Favorite.user_id == current_user.id,
+                Favorite.product_id == product_uuid,
+            )
+        )
+        existing = result.scalar_one_or_none()
 
-        if not product:
-            raise HTTPException(status_code=404, detail="Product not found")
-
-        # TODO: Check if already favorited and create Favorite record
-        # For now, return success as placeholder
-        return {"message": "Product added to favorites"}
+        return FavoriteCheckResponse(
+            product_id=product_id,
+            is_favorite=existing is not None,
+        )
 
 
-@router.delete("/products/{product_id}")
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_favorite(
     product_id: str,
     current_user: User = Depends(require_auth),
 ):
-    """
-    Remove a product from user's favorites.
+    """Remove a product from favorites by product_id."""
+    try:
+        product_uuid = uuid.UUID(product_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid product_id format",
+        )
 
-    - User can only remove their own favorites
-    """
     async with async_session() as session:
-        # Verify product exists
-        product_query = select(Product).where(Product.id == product_id)
-        product_result = await session.execute(product_query)
-        product = product_result.scalar_one_or_none()
+        result = await session.execute(
+            delete(Favorite).where(
+                Favorite.user_id == current_user.id,
+                Favorite.product_id == product_uuid,
+            )
+        )
+        await session.commit()
 
-        if not product:
-            raise HTTPException(status_code=404, detail="Product not found")
-
-        # TODO: Remove Favorite record
-        # For now, return success as placeholder
-        return {"message": "Product removed from favorites"}
+        if result.rowcount == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Favorite not found",
+            )

@@ -1,291 +1,240 @@
-# VietStore RAG
-
-Nền tảng thương mại điện tử kết hợp AI tìm kiếm sản phẩm gần đây.
-
-## 🌟 Tính năng chính
-
-- 🤖 **AI Chat Search** - Tìm sản phẩm bằng ngôn ngữ tự nhiên với vector search
-- 📍 **GPS Location** - Tự động xác định vị trí và tính khoảng cách
-- 🏪 **Store Cards** - Hiển thị cửa hàng với khoảng cách, giờ mở cửa, đánh giá
-- 🛒 **Giỏ hàng + Checkout** - Thanh toán với tính phí ship tự động
-- 💬 **Chat với cửa hàng** - Real-time WebSocket với E2E encryption
-- 📊 **Owner Portal** - Quản lý sản phẩm, đơn hàng
-- 🔒 **ECC Security** - ECDSA signing, ECDH key exchange, AES-GCM encryption
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, React Router, Zustand, React Query |
-| **Backend** | FastAPI, SQLAlchemy 2.0, Pydantic v2, Alembic |
-| **Database** | PostgreSQL 16, Redis 7 |
-| **AI/Search** | SentenceTransformers, Qdrant Vector Database |
-| **Security** | ECC Cryptography (ECDSA, ECDH, AES-GCM) |
-| **DevOps** | Docker Compose, Turborepo, GitHub Actions |
-
-## 📋 Yêu cầu hệ thống
-
-- Node.js >= 18
-- Python >= 3.11
-- Docker Desktop
-- PostgreSQL 16
-- Redis 7
-- Qdrant (optional, cho vector search)
+# VietStore RAG - Quick Start Guide
 
 ## 🚀 Quick Start
 
-### 1. Clone repository
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 18+ (optional for local dev)
+- Python 3.11+ (optional for local dev)
+
+### Method 1: Docker (Recommended)
 
 ```bash
+# 1. Clone repository
 git clone <repository-url>
-cd vietstore-rag
+cd AIPY-VN
+
+# 2. Start services
+docker compose up -d
+
+# 3. Run database migrations
+docker compose exec api-server alembic upgrade head
+
+# 4. Seed test data
+docker compose exec api-server python seed_test_data.py
+
+# 5. Access applications
+# Customer: http://localhost:3000
+# Owner: http://localhost:3001
+# Admin: http://localhost:3002
+# API Docs: http://localhost:9000/docs
 ```
 
-### 2. Setup môi trường
+### Method 2: Local Development
 
-```powershell
-# Windows PowerShell
-./scripts/setup.ps1
-```
-
-Hoặc thủ công:
-
+#### Backend
 ```bash
-# Backend
 cd apps/api-server
-uv sync
 
-# Frontend Customer
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment
+export $(cat .env | xargs)
+
+# Run migrations
+alembic upgrade head
+
+# Seed data
+python seed_test_data.py
+
+# Run server
+uvicorn src.main:app --reload --port 9000
+```
+
+#### Frontend (Customer)
+```bash
 cd apps/web-customer
 npm install
+npm run dev  # Port 3000
+```
 
-# Frontend Admin
+#### Frontend (Owner)
+```bash
+cd apps/web-owner
+npm install
+npm run dev  # Port 3001
+```
+
+#### Frontend (Admin)
+```bash
 cd apps/web-admin
 npm install
+npm run dev  # Port 3002
 ```
 
-### 3. Cấu hình environment variables
-
-Copy file `.env.example` sang `.env` và cập nhật:
-
-```bash
-cp apps/api-server/.env.example apps/api-server/.env
-```
-
-**Các biến quan trọng:**
-
-```env
-# Database
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/vietstore
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# ECC (Tạo mới hoặc sử dụng key có sẵn)
-ECC_PRIVATE_KEY_PEM=
-
-# Environment
-ENVIRONMENT=development
-DEBUG=true
-```
-
-### 4. Chạy ứng dụng
-
-```powershell
-# Chạy tất cả services
-./scripts/run.ps1 -Service all
-
-# Hoặc chạy riêng lẻ
-./scripts/run.ps1 -Service backend    # FastAPI on port 9000
-./scripts/run.ps1 -Service frontend   # React customer on port 5173
-./scripts/run.ps1 -Service admin      # React admin on port 3002
-```
-
-### 5. Database Migration
-
-```bash
-cd apps/api-server
-uv run alembic upgrade head
-```
-
-### 6. Seed dữ liệu test
-
-```bash
-cd apps/api-server
-uv run python src/seed.py
-```
-
-## 📚 API Documentation
-
-Sau khi chạy backend, truy cập:
-- **Swagger UI**: http://127.0.0.1:9000/docs
-- **ReDoc**: http://127.0.0.1:9000/redoc
-- **Health Check**: http://127.0.0.1:9000/health
-
-## 🏗️ Cấu trúc dự án
+## � Project Structure
 
 ```
-vietstore-rag/
+AIPY-VN/
 ├── apps/
 │   ├── api-server/          # FastAPI backend
 │   │   ├── src/
-│   │   │   ├── api/         # API routes
-│   │   │   ├── models/      # SQLAlchemy models
-│   │   │   ├── middleware/  # Custom middleware
+│   │   │   ├── api/         # API endpoints
+│   │   │   ├── models/      # Database models
 │   │   │   ├── services/    # Business logic
-│   │   │   ├── utils/       # Utilities (pagination, UUID)
-│   │   │   └── config.py    # Configuration management
+│   │   │   └── main.py
 │   │   ├── alembic/         # Database migrations
-│   │   └── tests/           # Unit tests
-│   ├── web-customer/        # React frontend người dùng
+│   │   └── seed_test_data.py
+│   ├── web-customer/        # React customer app
 │   │   ├── src/
-│   │   │   ├── components/  # React components
-│   │   │   ├── pages/       # Page components
-│   │   │   ├── hooks/       # Custom hooks
-│   │   │   └── services/    # API client
-│   ├── web-admin/           # React admin dashboard
-│   └── web-owner/           # React owner portal (coming soon)
-├── packages/                # Shared packages (coming soon)
-│   ├── shared-ui/           # Reusable components
-│   ├── shared-utils/        # Shared utilities
-│   └── shared-db/           # Shared database models
-├── docs/                    # Documentation
-├── scripts/                 # Automation scripts
-└── docker-compose.yml       # Docker orchestration
+│   │   │   ├── contexts/    # Auth, Cart contexts
+│   │   │   ├── services/    # API service
+│   │   │   └── pages/       # Page components
+│   ├── web-owner/           # React owner app
+│   └── web-admin/           # React admin app
+├── docker-compose.yml
+├── .env.example
+└── DEPLOYMENT.md
 ```
 
-## 🔐 Security
+## 🔐 Test Accounts
 
-### ECC Cryptography
+After seeding, you can use these test accounts:
 
-Dự án sử dụng Elliptic Curve Cryptography cho:
+**Customer:**
+- Email: customer@example.com
+- Password: password123
 
-- **JWT Signing**: ECDSA với curve P-256 (ES256)
-- **Key Exchange**: ECDH cho end-to-end encryption
-- **Digital Signatures**: API request signing cho high-value orders
-- **Message Encryption**: AES-GCM cho chat messages
+**Owner:**
+- Email: owner@example.com
+- Password: password123
 
-### Authentication
+**Admin:**
+- Email: admin@example.com
+- Password: password123
 
-- JWT tokens signed với ECDSA
-- Role-based access control (RBAC)
-- Password hashing với bcrypt (cost factor 12)
-- Token refresh mechanism
+## 🎯 Features
 
-### Protected Routes
+### Customer App
+- AI-powered product search
+- Store locator with maps
+- Shopping cart with store grouping
+- Checkout wizard
+- Order tracking
+- Store chat
 
-Tất cả routes trừ public endpoints require JWT authentication:
-- **Public**: `/health`, `/docs`, `/api/chat/search`, `/api/stores` (read-only)
-- **Protected**: Tất cả routes khác (require `Authorization: Bearer {token}`)
+### Owner App
+- Dashboard with analytics
+- Product management
+- Bulk upload (CSV/Excel)
+- Order management
+- Customer chat
+- Promotions & discounts
 
-## 🧪 Testing
+### Admin App
+- Store verification
+- Match queue (seed vs registered)
+- User management
+- Report moderation
+- Category management
+- System health monitoring
 
+## 🔧 Common Commands
+
+### Docker
 ```bash
-# Backend tests
-cd apps/api-server
-uv run pytest
+# Start all services
+docker compose up -d
 
-# Frontend lint
-cd apps/web-customer
-npm run lint
+# Stop all services
+docker compose down
 
-# Frontend format
-npm run format
+# View logs
+docker compose logs -f api-server
+
+# Restart service
+docker compose restart api-server
+
+# Run command in container
+docker compose exec api-server alembic upgrade head
 ```
 
-## 📊 Performance
-
-### Database Indexes
-
-Các indexes đã được thêm để tối ưu query performance:
-- `idx_store_status`, `idx_store_location`, `idx_store_industry`
-- `idx_product_store_id`, `idx_product_status`, `idx_product_name`
-- `idx_user_email`, `idx_user_role`, `idx_user_is_active`
-- `idx_order_user_id`, `idx_order_status`, `idx_order_created_at`
-
-### Frontend Optimization
-
-- Lazy loading cho tất cả routes
-- React.memo cho components
-- API response caching (5 minutes)
-- Code splitting với Vite
-
-## 🔧 Development
-
-### Code Style
-
-- **Backend**: Python type hints, Ruff formatter
-- **Frontend**: TypeScript strict mode, ESLint, Prettier
-- **Commit messages**: Conventional Commits
-
-### Lint & Format
-
+### Database
 ```bash
-# Backend
+# Create migration
 cd apps/api-server
-uv run ruff check .
-uv run ruff format .
+alembic revision --autogenerate -m "description"
 
-# Frontend Customer
-cd apps/web-customer
-npm run lint
-npm run format:check
-npm run format
+# Apply migration
+alembic upgrade head
 
-# Frontend Admin
-cd apps/web-admin
-npm run lint
-npm run format
+# Rollback
+alembic downgrade -1
+
+# View history
+alembic history
 ```
+
+### Frontend
+```bash
+# Install dependencies
+npm install
+
+# Run dev server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+## 📚 Documentation
+
+- [Deployment Guide](DEPLOYMENT.md) - Full deployment instructions
+- [API Documentation](http://localhost:9000/docs) - Interactive API docs
+- [AGENTS.md](AGENTS.md) - Development guidelines
 
 ## 🐛 Troubleshooting
 
 ### Database connection failed
-
 ```bash
-# Kiểm tra PostgreSQL đang chạy
-docker ps | grep postgres
+# Check PostgreSQL is running
+docker compose ps postgres
 
-# Kiểm tra connection string
-echo $DATABASE_URL
+# Restart database
+docker compose restart postgres
 ```
 
-### Redis connection failed
-
+### API not responding
 ```bash
-# Kiểm tra Redis đang chạy
-docker ps | grep redis
+# Check API logs
+docker compose logs api-server
 
-# Test connection
-redis-cli ping
+# Restart API
+docker compose restart api-server
 ```
 
-### ECC key errors
-
+### Frontend build failed
 ```bash
-# Generate new key (development only)
-# Key sẽ được auto-generated khi start app
-# Lưu key từ console output và set ECC_PRIVATE_KEY_PEM
+# Clear node_modules and reinstall
+rm -rf node_modules
+npm install
 ```
-
-## 📝 License
-
-MIT
 
 ## 🤝 Contributing
 
-1. Fork repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+1. Create a feature branch
+2. Make your changes
+3. Test thoroughly
+4. Submit a pull request
 
-## 📞 Support
+## � License
 
-- **Documentation**: Xem `docs/` folder
-- **Issues**: Open GitHub issue
-- **Discussions**: GitHub Discussions
-
----
-
-**Generated with [Devin](https://cli.devin.ai/docs)**
+MIT License - see LICENSE file for details
