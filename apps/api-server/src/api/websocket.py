@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from src.database import async_session
 from src.models.user import User
-from src.models.chat import ChatMessage
+from src.models.chat import Message as ChatMessage
 from src.middleware.auth_middleware import get_current_user
 
 router = APIRouter()

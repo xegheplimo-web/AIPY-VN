@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import CustomerLayout from './components/layout/CustomerLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 
@@ -22,11 +23,13 @@ function LoadingFallback() {
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
     </div>
+    </ErrorBoundary>
   );
 }
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-gray-50">
       <AuthProvider>
         <CartProvider>
@@ -52,5 +55,6 @@ export default function App() {
         </CartProvider>
       </AuthProvider>
     </div>
+    </ErrorBoundary>
   );
 }

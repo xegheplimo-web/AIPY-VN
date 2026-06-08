@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Package, ShoppingCart, DollarSign, Star, TrendingUp } from 'lucide-react';
+import { Package, ShoppingCart, DollarSign, Star } from 'lucide-react';
+import StatCard from '../components/dashboard/StatCard';
 
 export default function OwnerDashboardPage() {
   const stats = [
@@ -17,14 +18,7 @@ export default function OwnerDashboardPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {stats.map((stat, idx) => (
-            <div key={idx} className="bg-white rounded-xl p-4 shadow-sm border">
-              <div className="flex items-center justify-between mb-2">
-                <stat.icon className="w-5 h-5 text-blue-600" />
-                <span className="text-xs text-green-600 font-medium">{stat.trend}</span>
-              </div>
-              <p className="text-2xl font-bold">{stat.value}</p>
-              <p className="text-sm text-gray-500">{stat.label}</p>
-            </div>
+            <StatCard key={idx} icon={stat.icon} label={stat.label} value={stat.value} trend={stat.trend} />
           ))}
         </div>
 
