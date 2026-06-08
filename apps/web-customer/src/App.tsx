@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import ErrorBoundary from './components/ErrorBoundary';
 import CustomerLayout from './components/layout/CustomerLayout';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';

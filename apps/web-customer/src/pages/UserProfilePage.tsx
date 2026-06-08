@@ -1,32 +1,33 @@
-import { ChevronRight, Edit2, Heart, LogOut, MapPin, Save, ShoppingBag, User, X } from 'lucide-react';
+import {
+  ChevronRight,
+  Edit2,
+  Heart,
+  LogOut,
+  MapPin,
+  Save,
+  ShoppingBag,
+  User,
+  X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { apiService } from '../services/api';
 import { Form, FormCheckbox, FormField, FormSelect } from '../components/forms';
 import { userProfileSchema, type UserProfileFormData } from '../lib/validations';
 import { apiService } from '../services/api';
 import type { User } from '../services/api';
 
 export default function UserProfilePage() {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [fetching, setFetching] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    loadProfile();
+    apiService.getProfile()
+      .then((data) => setUser(data))
+      .catch((err) => console.error('Failed to load profile:', err));
   }, []);
-
-  const loadProfile = async () => {
-    try {
-      setFetching(true);
-      const data = await apiService.getProfile();
-      setUser(data);
-    } catch (err) {
-      console.error('Failed to load profile:', err);
-    } finally {
-      setFetching(false);
-    }
-  };
 
   const menuItems = [
     { icon: ShoppingBag, label: 'Đơn hàng của tôi', href: '/orders', badge: null },
@@ -37,14 +38,12 @@ export default function UserProfilePage() {
   const handleProfileUpdate = async (data: UserProfileFormData) => {
     setLoading(true);
     try {
-      await apiService.updateProfile({
-        name: data.fullName,
-        phone: data.phone,
-      });
+      await apiService.updateProfile(data as any);
       setIsEditing(false);
-      await loadProfile();
-    } catch (err: any) {
-      alert(err.message || 'Cập nhật thất bại, vui lòng thử lại!');
+      const updated = await apiService.getProfile();
+      setUser(updated);
+    } catch (err) {
+      alert('Cap nhat that bai, vui long thu lai!');
     } finally {
       setLoading(false);
     }
@@ -56,9 +55,9 @@ export default function UserProfilePage() {
   };
 
   const defaultValues: Partial<UserProfileFormData> = {
-    fullName: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
+    fullName: user?.name || user?.full_name || 'Nguoi dung',
+    email: user?.email || 'user@example.com',
+    phone: user?.phone || '0123456789',
     language: 'vi',
     currency: 'VND',
     emailNotifications: true,
@@ -86,8 +85,8 @@ export default function UserProfilePage() {
               <User className="w-8 h-8" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">{user?.name || 'Người dùng'}</h1>
-              <p className="text-blue-100">{user?.email || 'Chưa cập nhật email'}</p>
+              <h1 className="text-xl font-bold">{user?.name || user?.full_name || 'Nguoi dung'}</h1>
+              <p className="text-blue-100">{user?.email || 'user@example.com'}</p>
             </div>
           </div>
           <button
@@ -176,10 +175,12 @@ export default function UserProfilePage() {
 
       {/* Logout */}
       <button
-        onClick={handleLogout}
-        className="w-full mt-6 p-4 bg-red-50 text-red-600 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-100"
-      >
-        <LogOut className="w-5 h-5" /> Đăng xuất
+        onClick={async () => {
+          await apiService.logout();
+          navigate('/');
+        }}
+        className="w-full mt-6 p-4 bg-red-50 text-red-600 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-red-100">
+        <LogOut className="w-5 h-5" /> Dang xuat
       </button>
     </div>
   );

@@ -326,3 +326,58 @@ async def update_order_status(order_id: str, new_status: str, current_user=Depen
         await session.commit()
 
         return ConfirmOrderResponse(id=str(order.id), status=order.status)
+
+
+@router.post("/orders/{order_id}/cancel", response_model=OrderResponse)
+async def cancel_order(order_id: str, current_user=Depends(require_auth)):
+    """Cancel an order if it's still pending or confirmed"""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Order)
+            .options(selectinload(Order.items))
+            .where(Order.id == uuid.UUID(order_id))
+        )
+        order = result.scalar_one_or_none()
+
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to cancel this order")
+
+        if order.status not in ("pending", "confirmed"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot cancel order with status '{order.status}'",
+            )
+
+        order.status = "cancelled"
+        await session.commit()
+        await session.refresh(order)
+
+        return OrderResponse(
+            id=str(order.id),
+            order_number=order.order_number,
+            store_id=str(order.store_id),
+            delivery_method=order.delivery_method,
+            delivery_address=order.delivery_address,
+            subtotal=float(order.subtotal),
+            shipping_fee=float(order.shipping_fee),
+            discount=float(order.discount),
+            total_amount=float(order.total_amount),
+            payment_method=order.payment_method,
+            payment_status=order.payment_status,
+            status=order.status,
+            items=[
+                OrderItemResponse(
+                    id=str(item.id),
+                    product_id=str(item.product_id),
+                    product_name=f"Product {item.product_id}",
+                    quantity=item.quantity,
+                    unit_price=float(item.unit_price),
+                    subtotal=float(item.subtotal),
+                )
+                for item in order.items
+            ],
+            created_at=order.created_at or datetime.now().isoformat(),
+        )

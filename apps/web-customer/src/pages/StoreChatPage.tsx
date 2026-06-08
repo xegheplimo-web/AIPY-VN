@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import type { Store } from '../services/api';
 
@@ -41,7 +41,8 @@ interface QuickAction {
 }
 
 export default function StoreChatPage() {
-  const { store_id } = useParams<{ store_id: string }>();
+  const [searchParams] = useSearchParams();
+  const store_id = searchParams.get('store_id') || '';
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -49,13 +50,19 @@ export default function StoreChatPage() {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [store, setStore] = useState<ChatStore | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const [store, setStore] = useState<Store | null>(null);
 
   useEffect(() => {
-    if (store_id) loadStore(store_id);
-    setMessages([
-      { id: '1', role: 'store', content: 'Xin chào! Tôi có thể giúp gì cho bạn?', timestamp: new Date() },
-    ]);
+    if (store_id) {
+      loadStore(store_id);
+      loadMessages(store_id);
+      connectWebSocket(store_id);
+    }
+    return () => {
+      wsRef.current?.close();
+    };
   }, [store_id]);
 
   useEffect(() => {
@@ -67,12 +74,12 @@ export default function StoreChatPage() {
       const data: any = await apiService.getStore(storeId);
       const s = data?.data || data;
       setStore({
-        id: s.id,
-        name: s.name,
-        address: s.address,
-        phone: s.phone || '',
-        avatar: s.logo_url,
-        isOnline: s.is_open_now || false,
+        id: res.id,
+        name: res.name,
+        address: res.address,
+        phone: res.phone || '',
+        avatar: res.logo_url,
+        isOnline: res.is_open_now || false,
       });
     } catch (err) {
       console.error('Failed to load store:', err);
@@ -81,8 +88,62 @@ export default function StoreChatPage() {
     }
   };
 
+  const loadMessages = async (storeId: string) => {
+    try {
+      const data = await apiService.get(`/api/stores/${storeId}/messages`);
+      const loaded: Message[] = (data.messages || []).map((m: any) => ({
+        id: m.id,
+        role: m.sender_id === 'user' ? 'user' : 'store',
+        content: m.content,
+        timestamp: new Date(m.created_at),
+        type: m.message_type || 'text',
+        metadata: m.metadata,
+      }));
+      setMessages(loaded);
+    } catch (err) {
+      console.error('Failed to load messages:', err);
+    }
+  };
+
+  const connectWebSocket = (storeId: string) => {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:9000';
+    const wsUrl = API_BASE.replace(/^http/, 'ws') + `/api/ws/chat/${storeId}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const incoming: Message = {
+          id: data.id || Date.now().toString(),
+          role: data.sender_id === 'user' ? 'user' : 'store',
+          content: data.content,
+          timestamp: new Date(data.created_at || Date.now()),
+          type: data.message_type || 'text',
+          metadata: data.metadata,
+        };
+        setMessages((prev) => [...prev, incoming]);
+      } catch (e) {
+        console.error('WS message parse error:', e);
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.error('WebSocket error:', err);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket closed');
+    };
+
+    wsRef.current = ws;
+  };
+
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !store_id) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -93,16 +154,26 @@ export default function StoreChatPage() {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
-    // TODO: Send real message via WebSocket/API when backend is ready
-    setTimeout(() => {
-      const storeMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'store',
-        content: 'Cảm ơn bạn đã nhắn tin! Chúng tôi sẽ phản hồi sớm nhất có thể.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, storeMsg]);
-    }, 1000);
+    // Send via WebSocket if connected
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          content: input,
+          message_type: 'text',
+        })
+      );
+    } else {
+      // Fallback: send via HTTP API
+      try {
+        await apiService.post('/api/messages', {
+          store_id: store_id,
+          content: input,
+          message_type: 'text',
+        });
+      } catch (err) {
+        console.error('Failed to send message:', err);
+      }
+    }
   };
 
   const handleQuickAction = (actionId: string) => {

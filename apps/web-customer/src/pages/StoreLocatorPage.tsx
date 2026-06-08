@@ -1,14 +1,12 @@
-import { useState, useEffect } from 'react';
-import { MapPin, Navigation, Filter, X, Star, Clock, Phone } from 'lucide-react';
-import InteractiveMap from '../components/InteractiveMap';
+import { Clock, Filter, MapPin, Navigation, Phone, Star, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import GeoAutocomplete from '../components/GeoAutocomplete';
+import InteractiveMap from '../components/InteractiveMap';
+import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { ScrollArea } from '../components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { apiService } from '../services/api';
-import type { Store } from '../services/api';
+import { ScrollArea } from '../components/ui/scroll-area';
 
 interface LocatorStore {
   id: string;
@@ -69,23 +67,21 @@ export default function StoreLocatorPage() {
     loadBrands();
   }, []);
 
-  const loadCategories = async () => {
-    try {
-      const data = await apiService.get('/api/geo/categories');
-      setCategories(data as Category[] || []);
-    } catch (err) {
-      console.error('Failed to load categories:', err);
-    }
-  };
+  // Load categories
+  useEffect(() => {
+    apiService
+      .get('/api/geo/categories')
+      .then((data: any) => setCategories(data))
+      .catch((err) => console.error('Failed to load categories:', err));
+  }, []);
 
-  const loadBrands = async () => {
-    try {
-      const data = await apiService.get('/api/geo/brands');
-      setBrands(data as Brand[] || []);
-    } catch (err) {
-      console.error('Failed to load brands:', err);
-    }
-  };
+  // Load brands
+  useEffect(() => {
+    apiService
+      .get('/api/geo/brands')
+      .then((data: any) => setBrands(data))
+      .catch((err) => console.error('Failed to load brands:', err));
+  }, []);
 
   const searchNearby = async () => {
     if (!userLocation) {
@@ -103,21 +99,11 @@ export default function StoreLocatorPage() {
       if (selectedCategory) params.category = selectedCategory;
       if (selectedBrand) params.brand = selectedBrand;
 
-      const query = new URLSearchParams(params);
-      const data: any = await apiService.get(`/api/geo/nearby?${query}`);
-      const rawStores = (data.stores || data || []) as Store[];
-      setStores(rawStores.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        lat: s.latitude || s.lat || 0,
-        lng: s.longitude || s.lng || 0,
-        address: s.address,
-        phone: s.phone || undefined,
-        rating: s.rating || undefined,
-        review_count: s.review_count || s.total_reviews || undefined,
-        distance: s.distance_m !== undefined ? { meters: s.distance_m, text: `${s.distance_m}m` } : undefined,
-        images: s.images || s.cover_image_url ? [s.cover_image_url] : undefined,
-      })));
+      if (selectedCategory) params.append('category', selectedCategory);
+      if (selectedBrand) params.append('brand', selectedBrand);
+
+      const data = await apiService.get(`/api/geo/nearby?${params}`);
+      setStores(data.stores || []);
     } catch (error) {
       console.error('Search error:', error);
     } finally {
@@ -136,21 +122,8 @@ export default function StoreLocatorPage() {
       if (selectedCategory) params.category = selectedCategory;
       if (selectedBrand) params.brand = selectedBrand;
 
-      const qs = new URLSearchParams(params);
-      const data: any = await apiService.get(`/api/geo/search?${qs}`);
-      const rawStores = (data.stores || data || []) as Store[];
-      setStores(rawStores.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        lat: s.latitude || s.lat || 0,
-        lng: s.longitude || s.lng || 0,
-        address: s.address,
-        phone: s.phone || undefined,
-        rating: s.rating || undefined,
-        review_count: s.review_count || s.total_reviews || undefined,
-        distance: s.distance_m !== undefined ? { meters: s.distance_m, text: `${s.distance_m}m` } : undefined,
-        images: s.images || s.cover_image_url ? [s.cover_image_url] : undefined,
-      })));
+      const data = await apiService.get(`/api/geo/search?${params}`);
+      setStores(data.stores || []);
     } catch (error) {
       console.error('Search error:', error);
     } finally {
@@ -245,7 +218,9 @@ export default function StoreLocatorPage() {
                             key={cat.id}
                             onClick={() => setSelectedCategory(cat.slug)}
                             className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
-                              selectedCategory === cat.slug ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'
+                              selectedCategory === cat.slug
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'hover:bg-gray-50'
                             }`}
                           >
                             <span>{cat.icon}</span>
@@ -273,7 +248,9 @@ export default function StoreLocatorPage() {
                             key={brand.id}
                             onClick={() => setSelectedBrand(brand.slug)}
                             className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
-                              selectedBrand === brand.slug ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'
+                              selectedBrand === brand.slug
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'hover:bg-gray-50'
                             }`}
                           >
                             {brand.name}
@@ -314,12 +291,20 @@ export default function StoreLocatorPage() {
                             <h3 className="font-medium text-gray-900">{store.name}</h3>
                             {store.brand && <Badge variant="secondary" className="mt-1">{store.brand.name}</Badge>}
                             <p className="text-sm text-gray-600 mt-1">{store.address}</p>
-                            {store.distance && <div className="text-sm text-blue-600 mt-1">{store.distance.text}</div>}
+                            {store.distance && (
+                              <div className="text-sm text-blue-600 mt-1">
+                                {store.distance.text}
+                              </div>
+                            )}
                             {store.rating && (
                               <div className="flex items-center gap-1 mt-1">
                                 <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                                 <span className="text-sm">{store.rating}</span>
-                                {store.review_count && <span className="text-sm text-gray-500">({store.review_count})</span>}
+                                {store.review_count && (
+                                  <span className="text-sm text-gray-500">
+                                    ({store.review_count})
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -364,6 +349,7 @@ export default function StoreLocatorPage() {
           {selectedStore && (
             <div className="space-y-4">
               {selectedStore.brand && <Badge variant="secondary">{selectedStore.brand.name}</Badge>}
+
               <div className="flex items-start gap-2 text-gray-600">
                 <MapPin className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <p>{selectedStore.address}</p>
@@ -392,7 +378,9 @@ export default function StoreLocatorPage() {
                   <Clock className="h-5 w-5 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium">Giờ mở cửa</p>
-                    <p className="text-sm">{selectedStore.opening_hours.raw || 'Liên hệ cửa hàng'}</p>
+                    <p className="text-sm">
+                      {selectedStore.opening_hours.raw || 'Liên hệ cửa hàng'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -405,7 +393,9 @@ export default function StoreLocatorPage() {
               )}
               <div className="flex gap-2 pt-4">
                 <Button className="flex-1">Chỉ đường</Button>
-                <Button variant="outline" className="flex-1">Gọi điện</Button>
+                <Button variant="outline" className="flex-1">
+                  Gọi điện
+                </Button>
               </div>
             </div>
           )}

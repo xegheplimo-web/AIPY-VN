@@ -157,21 +157,24 @@ export default function CartPage() {
   };
 
   const applyPromoCode = async () => {
-    if (!promoCode.trim()) return;
-    setPromoValidating(true);
+    if (!promoCode.trim()) {
+      alert('Vui lòng nhập mã giảm giá');
+      return;
+    }
+    const currentSubtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
     try {
-      const subtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
-      const result = await apiService.validatePromotion(promoCode, subtotal);
-      if (result.valid) {
+      const res = await apiService.validatePromotion(promoCode, currentSubtotal);
+      if (res.valid) {
         setPromoApplied(true);
-        setPromoDiscount(result.discount);
+        setPromoDiscount(res.discount);
       } else {
-        alert('Mã giảm giá không hợp lệ hoặc không đủ điều kiện');
+        alert('Mã giảm giá không hợp lệ');
+        setPromoApplied(false);
+        setPromoDiscount(0);
       }
     } catch (err) {
-      alert('Mã giảm giá không hợp lệ');
-    } finally {
-      setPromoValidating(false);
+      console.error('Promo validation failed:', err);
+      alert('Không thể kiểm tra mã giảm giá. Vui lòng thử lại sau.');
     }
   };
 

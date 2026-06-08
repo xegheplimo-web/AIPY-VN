@@ -57,6 +57,13 @@ export default function StoreDetailPage() {
           stock: product.stock,
           store_id: store.id,
           store_name: store.name,
+          store: {
+            id: store.id,
+            name: store.name,
+            address: store.address,
+            distanceKm: store.distance_m ? store.distance_m / 1000 : 0,
+            isSameDistrict: true,
+          },
           images: product.images,
           unit: 'cái',
           subtotal: product.price || 0,
