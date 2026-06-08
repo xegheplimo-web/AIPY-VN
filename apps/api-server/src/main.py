@@ -35,7 +35,6 @@ from src.api.reviews import router as reviews
 from src.api.store_locator import router as store_locator
 from src.api.notifications_api import router as notifications_api
 from src.api.advanced_search_api import router as advanced_search_api
-from src.api.payment_gateway_api import router as payment_gateway_api
 from src.config import config, validate_config
 
 # from src.database import init_db  # Using Alembic migrations instead
@@ -249,8 +248,6 @@ app.include_router(notifications_api, prefix=api_v1_prefix)
 # Add advanced search API router
 app.include_router(advanced_search_api, prefix=api_v1_prefix)
 
-# Add payment gateway API router
-app.include_router(payment_gateway_api, prefix=api_v1_prefix)
 
 # WebSocket routes
 app.include_router(websocket)

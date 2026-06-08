@@ -11,6 +11,7 @@ from .favorite import Favorite
 from .promotion import Promotion
 from .report import Report
 from .payment import PaymentTransaction
+from .store_match import StoreMatch
 
 __all__ = [
     "User",
@@ -29,4 +30,5 @@ __all__ = [
     "Promotion",
     "Report",
     "PaymentTransaction",
+    "StoreMatch",
 ]

@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from src.agents import get_shopping_agent
+from src.services.rag_search import hybrid_search_products
 from src.database import async_session
 from src.middleware.auth_middleware import require_auth
 from src.models.chat import Message
@@ -352,17 +353,11 @@ async def chat_search(request: ChatSearchRequest):
         user_lng = request.location.get("lng") if request.location else None
 
         async with async_session() as session:
-            # Real product search
-            search_term = f"%{request.query}%"
-            stmt = (
-                select(Product)
-                .where(Product.name.ilike(search_term))
-                .where(Product.stock > 0)
-                .where(Product.status == "active")
-                .options(selectinload(Product.store))
+            # Hybrid search (ILIKE + fuzzy RAG fallback)
+            products = await hybrid_search_products(
+                request.query,
+                limit=50,
             )
-            result = await session.execute(stmt)
-            products = result.scalars().all()
 
             # Group by store
             store_products = {}

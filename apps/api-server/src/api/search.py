@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from src.database import async_session
 from src.models.store import Category, Product
 from src.services.geo import haversine_distance
+from src.services.rag_search import hybrid_search_products
 
 router = APIRouter(prefix="/api", tags=["Search"])
 
@@ -57,17 +58,11 @@ class ChatSearchResponse(BaseModel):
 @router.post("/chat/search", response_model=ChatSearchResponse)
 async def chat_search(req: ChatSearchRequest):
     async with async_session() as session:
-        # 1. Find products matching query (case-insensitive)
-        search_term = f"%{sanitize_search_term(req.query)}%"
-        stmt = (
-            select(Product)
-            .where(Product.name.ilike(search_term))
-            .where(Product.stock > 0)
-            .where(Product.status == "active")
-            .options(selectinload(Product.store))
+        # 1. Find products — hybrid search (ILIKE + fuzzy RAG fallback)
+        products = await hybrid_search_products(
+            sanitize_search_term(req.query),
+            limit=req.limit * 3,
         )
-        result = await session.execute(stmt)
-        products = result.scalars().all()
 
         # 2. Group products by store
         store_products = {}
@@ -131,7 +126,11 @@ async def chat_search(req: ChatSearchRequest):
                         stock=p.stock,
                         in_stock=p.stock > 0,
                         shelf_location=p.shelf_location or "",
-                        category=category_map.get(str(p.category_id)) if p.category_id else None,
+                        category=(
+                            category_map.get(str(p.category_id))
+                            if p.category_id
+                            else None
+                        ),
                     )
                 )
 
