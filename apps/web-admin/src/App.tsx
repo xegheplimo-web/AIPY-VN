@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
 
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'));
@@ -22,21 +23,23 @@ function LoadingFallback() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Suspense fallback={<LoadingFallback />}>
-        <Routes>
-          <Route path="/login" element={<AdminLoginPage />} />
-          <Route path="/dashboard" element={<AdminDashboardPage />} />
-          <Route path="/stores" element={<StoresManagementPage />} />
-          <Route path="/stores/verification" element={<StoreVerificationPage />} />
-          <Route path="/match-queue" element={<MatchQueuePage />} />
-          <Route path="/users" element={<UserManagementPage />} />
-          <Route path="/reports" element={<ReportModerationPage />} />
-          <Route path="/categories" element={<CategoryManagerPage />} />
-          <Route path="/system" element={<SystemHealthPage />} />
-          <Route path="/" element={<AdminDashboardPage />} />
-        </Routes>
-      </Suspense>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
+            <Route path="/login" element={<AdminLoginPage />} />
+            <Route path="/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/stores" element={<StoresManagementPage />} />
+            <Route path="/stores/verification" element={<StoreVerificationPage />} />
+            <Route path="/match-queue" element={<MatchQueuePage />} />
+            <Route path="/users" element={<UserManagementPage />} />
+            <Route path="/reports" element={<ReportModerationPage />} />
+            <Route path="/categories" element={<CategoryManagerPage />} />
+            <Route path="/system" element={<SystemHealthPage />} />
+            <Route path="/" element={<AdminDashboardPage />} />
+          </Routes>
+        </Suspense>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
